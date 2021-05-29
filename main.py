@@ -1,11 +1,5 @@
-# import matplotlib.pyplot as plt
-# import time
-# import random
-#
-# import plotly.express as px
-# import pandas as pd
 import logging
-
+import multiprocessing
 import pygame
 from pygame.locals import *
 from OpenGL.GL import *
@@ -27,16 +21,6 @@ vertices = (
     (-1, 1, 1)
 )
 
-vertices_1 = (
-    (1, -1, -1),
-    (1, 1, -1),
-    (-1, 1, -1),
-    (-1, -1, -1),
-    (1, -1, 1),
-    (1, 1, 1),
-    (-1, -1, 1),
-    (-1, 1, 2)
-)
 
 vertices_2 = (
     (1, -1, -1),
@@ -103,6 +87,7 @@ edges_2 = (
 
 data_queue = queue.Queue()
 
+
 # data_queue.put(vertices)
 # data_queue.put(vertices_1)
 
@@ -113,7 +98,10 @@ def Cube():
             glVertex3fv(vertices[vertex])
     glEnd()
 
+
 LAST_VERTICES = [vertices_2]
+
+
 def model_1(data_queue):
     glBegin(GL_LINES)
     current_edges = edges_2
@@ -160,14 +148,11 @@ def render(queue):
         pygame.time.wait(10)
 
 
-# dynamic_images(data_queue)
-# render()
 
-
-import multiprocessing
 def worker(name, que):
     dynamic_images(que)
     # que.put("%d is done" % name)
+
 
 if __name__ == '__main__':
     pool = multiprocessing.Pool(processes=3)
@@ -175,38 +160,3 @@ if __name__ == '__main__':
     q = m.Queue()
     workers = pool.apply_async(worker, (33, q))
     render(q)
-
-#
-# df = pd.DataFrame(dict(col_x=[2, 4, 7, 2], col_y=[2, 5, 1 ,8], col_z=[4, 7, 2, 9],))
-#
-# fig = px.scatter_3d(df, x='col_x', y='col_y', z='col_z',
-#                     color='col_z',
-#                     title="3D Scatter Plot")
-# fig.show()
-
-
-#
-# ysample = random.sample(range(-50, 50), 100)
-# zsample = random.sample(range(-50, 50), 100)
-#
-# xdata = []
-# ydata = []
-#
-# plt.show()
-#
-# axes = plt.gca()
-# axes.set_xlim(0, 100)
-# axes.set_ylim(-50, +50)
-# line, = axes.plot(xdata, ydata, 'r-')
-#
-# for i in range(100):
-#     xdata.append(i)
-#     ydata.append(ysample[i])
-#     line.set_xdata(xdata)
-#     line.set_ydata(ydata)
-#     plt.draw()
-#     plt.pause(1e-17)
-#     time.sleep(0.1)
-#
-# # add this if you don't want the window to disappear at the end
-# plt.show()
