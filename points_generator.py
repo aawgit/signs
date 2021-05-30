@@ -36,7 +36,8 @@ def static_images(file_list):
 
 def dynamic_images(queue):
   # For webcam input:
-  cap = cv2.VideoCapture(0)
+  # cap = cv2.VideoCapture(0)
+  cap = cv2.VideoCapture("../../Downloads/SLSL - Sinhala Sign Alphabet - Sri Lankan Sign Language - Chaminda Hewapathirana.mp4")
   with mp_hands.Hands(
       min_detection_confidence=0.5,
       min_tracking_confidence=0.5) as hands:
@@ -79,7 +80,7 @@ def dynamic_images(queue):
       #   for hand_landmarks in results.multi_hand_landmarks:
       #     mp_drawing.draw_landmarks(
       #         image, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-      # cv2.imshow('MediaPipe Hands', image)
-      # if cv2.waitKey(5) & 0xFF == 27:
-      #   break
+      cv2.imshow('MediaPipe Hands', image)
+      if cv2.waitKey(5) & 0xFF == 27:
+        break
   cap.release()
