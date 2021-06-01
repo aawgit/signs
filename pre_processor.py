@@ -1,6 +1,7 @@
 import math
 import numpy as np
 
+
 def rotate_around_axis_x(frame_vertices):
     reference_joints = [0, 9]
     point_1 = frame_vertices[reference_joints[0]]
@@ -10,7 +11,6 @@ def rotate_around_axis_x(frame_vertices):
     c = math.sqrt(a**2 + b**2)
     cos = b/c
     sin = a/c
-    print(np.rad2deg(np.arccos(cos)))
     rotation_matrix_x = np.array([[1, 0, 0],
                                 [0, cos, -sin],
                                 [0, sin, cos]])
@@ -26,7 +26,7 @@ def rotate_around_axis_x(frame_vertices):
         rotated = np.matmul(rotation_matrix_x_2, rotated)
         rotated_vertices.append((rotated[0], rotated[1], rotated[2]))
     return rotated_vertices
-    # return frame_vertices
+
 
 
 def rotate_around_axis_z(frame_vertices):
@@ -86,3 +86,24 @@ def pre_process(land_marks):
     processed = rotate_around_axis_z(processed)
     processed = rotate_around_axis_x(processed)
     return tuple(processed)
+
+def angle(v1, v2, acute=True):
+    v1 = [v1[1][0]-v1[0][0], v1[1][1]-v1[0][1], v1[1][2]-v1[0][2]]
+    v2 = [v2[1][0] - v2[0][0], v2[1][1] - v2[0][1], v2[1][2] - v2[0][2]]
+# v1 is your firsr vector
+# v2 is your second vector
+    angle = np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
+    if (acute == True):
+        angle = angle
+    else:
+        angle = 2 * np.pi - angle
+    return np.round(180*angle/np.pi)
+
+def get_angles(frame_vertices):
+    thumb_angle = angle((frame_vertices[2], frame_vertices[0]), (frame_vertices[4], frame_vertices[2]))
+    index_angle = angle((frame_vertices[5], frame_vertices[0]), (frame_vertices[8], frame_vertices[5]))
+    middle_angle = angle((frame_vertices[9], frame_vertices[0]), (frame_vertices[12], frame_vertices[9]))
+    ring_angle = angle((frame_vertices[13], frame_vertices[0]), (frame_vertices[16], frame_vertices[13]))
+    pinky_angle = angle((frame_vertices[17], frame_vertices[0]), (frame_vertices[20], frame_vertices[9]))
+    return [thumb_angle, index_angle, middle_angle, ring_angle, pinky_angle]
+

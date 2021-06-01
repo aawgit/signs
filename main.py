@@ -8,7 +8,7 @@ from OpenGL.GLU import *
 import queue
 
 from points_generator import dynamic_images
-from pre_processor import pre_process
+from pre_processor import pre_process, get_angles
 
 vertices = (
     (1, -1, -1),
@@ -20,7 +20,6 @@ vertices = (
     (-1, -1, 1),
     (-1, 1, 1)
 )
-
 
 vertices_2 = (
     (1, -1, -1),
@@ -101,9 +100,32 @@ def Cube():
 
 LAST_VERTICES = [vertices_2]
 
+def line_model(current_edges, current_vertices):
+    glLineWidth(4.0)
+    glBegin(GL_LINES)
+    glColor3f(1.0, 1.0, 1.0)
+    for edge in current_edges:
+        for vertex in edge:
+            glVertex3fv(current_vertices[vertex])
+    glEnd()
+
+def joint_model(current_vertices):
+    glEnable(GL_POINT_SMOOTH)
+    glPointSize(8.0)
+    glBegin(GL_POINTS)
+    glColor3f(1.0, 1.0, 1.0)
+    for pt in current_vertices:
+        glVertex3fv(pt)
+    glEnd()
+
+def reference_line(current_vertices):
+    glBegin(GL_LINES)
+    glColor3f(0.0, 1.0, 0.0)
+    glVertex3fv(current_vertices[0])
+    glVertex3fv(current_vertices[9])
+    glEnd()
 
 def model_1(data_queue):
-    glBegin(GL_LINES)
     current_edges = edges_2
     last_vertices_local = LAST_VERTICES[0]
     try:
@@ -118,11 +140,34 @@ def model_1(data_queue):
         logging.error('Error: {}'.format(e))
         current_vertices = vertices
         current_edges = edges
+    line_model(current_edges, current_vertices)
+    joint_model(current_vertices)
+    reference_line(current_vertices)
+    return current_vertices
 
-    for edge in current_edges:
-        for vertex in edge:
-            glVertex3fv(current_vertices[vertex])
-    glEnd()
+
+def display_info(vertices):
+    drawText((-2, -1, 0), 'Thumb')
+    drawText((-1, -1, 0), 'Index')
+    drawText((-0, -1, 0), 'Middle')
+    drawText((1, -1, 0), 'Ring')
+    drawText((2, -1, 0), 'Pinky')
+
+    angles = get_angles(vertices)
+    drawText((-2.5, -1.25, 0), 'Angle')
+    drawText((-2, -1.25, 0), str(angles[0]))
+    drawText((-1, -1.25, 0), str(angles[1]))
+    drawText((0, -1.25, 0), str(angles[2]))
+    drawText((1, -1.25, 0), str(angles[3]))
+    drawText((2, -1.25, 0), str(angles[4]))
+
+
+def drawText(position, textString):
+    font = pygame.font.Font(None, 20)
+    textSurface = font.render(textString, True, (255, 255, 255, 255), (0, 0, 0, 255))
+    textData = pygame.image.tostring(textSurface, "RGBA", True)
+    glRasterPos3d(*position)
+    glDrawPixels(textSurface.get_width(), textSurface.get_height(), GL_RGBA, GL_UNSIGNED_BYTE, textData)
 
 
 def render(queue):
@@ -142,11 +187,12 @@ def render(queue):
 
         # glRotatef(1, 3, 1, 1)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        model_1(queue)
+        vertices = model_1(queue)
+        # model_2()
         # Cube()
+        display_info(vertices)
         pygame.display.flip()
         pygame.time.wait(10)
-
 
 
 def worker(name, que):

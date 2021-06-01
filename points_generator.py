@@ -36,8 +36,8 @@ def static_images(file_list):
 
 def dynamic_images(queue):
   # For webcam input:
-  # cap = cv2.VideoCapture(0)
-  cap = cv2.VideoCapture("../../Downloads/SLSL - Sinhala Sign Alphabet - Sri Lankan Sign Language - Chaminda Hewapathirana.mp4")
+  cap = cv2.VideoCapture(0)
+  # cap = cv2.VideoCapture("../../Downloads/SLSL - Sinhala Sign Alphabet - Sri Lankan Sign Language - Chaminda Hewapathirana.mp4")
   with mp_hands.Hands(
       min_detection_confidence=0.5,
       min_tracking_confidence=0.5) as hands:
