@@ -1,0 +1,9 @@
+correct labelling errors
+	dh- noise
+	
+clustering for unsupervised approach
+
+add thumb
+use co-ordinates of (all) joints instead of angles
+
+pose estimation error correction by restricting poses considering DoF
