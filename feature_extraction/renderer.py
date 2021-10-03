@@ -4,8 +4,11 @@ from OpenGL.GLU import *
 import logging
 import pygame
 
-from utils.constants import EDGES_MEDIA_PIPE, EDGES_CUBE, VERTICES_DEFAULT_MP, VERTICES_CUBE
-from feature_extraction.pre_processor import get_angles
+from utils.constants import EDGES_CUBE, VERTICES_CUBE
+from pose_estimation.vertices_mapper import EDGES_MEDIA_PIPE, VERTICES_DEFAULT_MP
+from feature_extraction.pre_processor import get_angles, pre_process
+
+from scipy.spatial import distance
 
 LAST_VERTICES = [VERTICES_DEFAULT_MP]
 
@@ -45,27 +48,55 @@ def reference_line(current_vertices):
     glVertex3fv(current_vertices[9])
     glEnd()
 
+def reference_line_y(current_vertices):
+    glBegin(GL_LINES)
+    glColor3f(1.0, 1.0, 0.0)
+    glVertex3fv(current_vertices[5])
+    glVertex3fv(current_vertices[17])
+    glEnd()
+
+
+def draw_axes():
+    glBegin(GL_LINES)
+    # x red
+    glColor3f(1.0, 0.0, 0.0)
+    glVertex3f(0.0, 0.0, 0.0)
+    glVertex3f(10.0, 0.0, 0.0)
+
+    # y light blue
+    glColor3f(0.0, 0.5, 0.5)
+    glVertex3f(0.0, 0.0, 0.0)
+    glVertex3f(0.0, 10.0, 0.0)
+
+    # z purple
+    glColor3f(1.0, 0.0, 1.0)
+    glVertex3f(0.0, 0.0, 0.0)
+    glVertex3f(0.0, 0.0, 10.0)
+    glEnd()
 
 def hand_model(vertices, current_edges):
     line_model(current_edges, vertices)
     joint_model(vertices)
     reference_line(vertices)
+    reference_line_y(vertices)
 
 
 def display_info(vertices):
-    drawText((-2, -1, 0), 'Thumb')
-    drawText((-1, -1, 0), 'Index')
-    drawText((-0, -1, 0), 'Middle')
-    drawText((1, -1, 0), 'Ring')
-    drawText((2, -1, 0), 'Pinky')
+    # drawText((-2, -1, 0), 'Thumb')
+    # drawText((-1, -1, 0), 'Index')
+    # drawText((-0, -1, 0), 'Middle')
+    # drawText((1, -1, 0), 'Ring')
+    # drawText((2, -1, 0), 'Pinky')
+    #
+    # angles = get_angles(vertices)
+    # drawText((-2.5, -1.25, 0), 'Angle')
+    # drawText((-2, -1.25, 0), str(angles[0]))
+    # drawText((-1, -1.25, 0), str(angles[1]))
+    # drawText((0, -1.25, 0), str(angles[2]))
+    # drawText((1, -1.25, 0), str(angles[3]))
+    # drawText((2, -1.25, 0), str(angles[4]))
 
-    angles = get_angles(vertices)
-    drawText((-2.5, -1.25, 0), 'Angle')
-    drawText((-2, -1.25, 0), str(angles[0]))
-    drawText((-1, -1.25, 0), str(angles[1]))
-    drawText((0, -1.25, 0), str(angles[2]))
-    drawText((1, -1.25, 0), str(angles[3]))
-    drawText((2, -1.25, 0), str(angles[4]))
+    drawText((-2, -1.25, 0), str(distance.euclidean(vertices[5], vertices[17])))
 
 
 
@@ -85,6 +116,8 @@ def render(queue):
     gluPerspective(45, (display[0] / display[1]), 0.1, 50.0)
 
     glTranslatef(0.0, 0.0, -5)
+
+    glRotatef(90, 1, 0, 0)
 
     while True:
         try:
@@ -106,9 +139,12 @@ def render(queue):
                 pygame.quit()
                 quit()
 
-        # glRotatef(1, 3, 1, 1)
+        # glRotatef(0.5, 0, 1, 0)
+        # TODO: Remove this after pre-processing testing
+        # current_vertices = pre_process(current_vertices)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         hand_model(current_vertices, current_edges)
         display_info(current_vertices)
+        draw_axes()
         pygame.display.flip()
         pygame.time.wait(10)
