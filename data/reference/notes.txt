@@ -1,0 +1,34 @@
+
+
+
+see scale_vertices
+
+
+
+
+
+
+
+
+
+
+correct labelling errors
+	dh- noise
+	
+clustering for unsupervised approach
+
+add thumb
+use co-ordinates of (all) joints instead of angles
+
+pose estimation error correction by restricting poses considering DoF
+
+## TODO:
+ - Fix rotations, instead of x, y, z, take a frame with respective to hand (like pitch and yoke) - done
+ - Fix size normalization
+ - Refactor training and testing flows to introduce abstraction on features
+ - a. Recheck with angles, with ego hands and with 2 dof for thumb
+   b. fix limb size change issue when angle changes and test with vertices
+   select what to first -a or -b
+
+1. Use coordinates (flattened) and euclidian distance to get the nearest neighbour (out of labelled signs)
+2. Use statistical inference to improve reference poses (use ego hands to model distribution)

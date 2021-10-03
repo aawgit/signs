@@ -1,6 +1,3 @@
-from pre_processor import *
-
-
 def test_rotation():
     vertices = [(0.0, 0.0, 0.0),
                 (0.494931877409792, 0.06352074855624598, 0.34365336068146485),
