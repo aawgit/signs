@@ -1,7 +1,9 @@
 import logging
 import math
 import numpy as np
+import pandas as pd
 from scipy.spatial import distance
+
 
 def stop_rotation_around_x(frame_vertices, reference_joints):
     point_1 = frame_vertices[reference_joints[0]]
@@ -82,7 +84,7 @@ def stop_rotation_around_z(frame_vertices, reference_joints):
     return rotated_vertices
 
 
-def scale_vertices(frame_vertices, scale_factor):
+def scale_vertices(frame_vertices, scale_factor=1):
     # TODO: This isn't correct. Each limb should be increased/decreased using a unit vector * change in base limb length
     wrist_joint = frame_vertices[0]
     index_base_joint = frame_vertices[9]
@@ -103,20 +105,10 @@ def normalize_movement(frame_vertices):
     return relocated_vertices
 
 
-def pre_process(land_marks):
-    scale_factor = 1
-    # TODO: Change to below method after rotation testing
+def pre_process(land_marks, steps, args_for_steps):
     processed = land_marks
-
-    processed = normalize_movement(processed)
-    processed = scale_vertices(processed, scale_factor)
-
-
-    processed = stop_rotation_around_x(processed, [0, 9])
-
-    processed = stop_rotation_around_z(processed, [0, 9])
-
-    processed = stop_rotation_around_y(processed, [5, 17])
+    for idx, step in enumerate(steps):
+        processed = step(processed, *args_for_steps[idx])
     return tuple(processed)
 
 
@@ -142,12 +134,52 @@ def get_angles(frame_vertices):
     return [thumb_angle, index_angle, middle_angle, ring_angle, pinky_angle]
 
 
+def flatten_points(land_marks: list):
+    flatten_coordinates = []
+    for point in land_marks:
+        for coordinate in point:
+            flatten_coordinates.append(coordinate)
+    return flatten_coordinates
+
+
+def pre_process_single_frame(land_mark):
+    if not land_mark: return
+    steps = [
+        normalize_movement,
+        scale_vertices,
+        stop_rotation_around_x,
+        stop_rotation_around_z,
+        stop_rotation_around_y
+    ]
+    args_for_steps = [(), (), ([0, 9],), ([0, 9],), ([5, 17],)]
+    current_vertices = pre_process(land_mark, steps, args_for_steps)
+    # coordinates = []
+    # for current_vertex in current_vertices:
+    #     for coordinate in current_vertex:
+    #         coordinates.append(np.round(coordinate, 8))
+    # logging.info(coordinates)
+    return current_vertices
+
+
 def run_pre_process_steps(pose_q, processed_q_1, processed_q_2, for_labelling=False):
+    steps = [
+        normalize_movement,
+        scale_vertices,
+        stop_rotation_around_x,
+        stop_rotation_around_z,
+        stop_rotation_around_y
+    ]
+    args_for_steps = [(), (), ([0, 9],), ([0, 9],), ([5, 17],)]
     while True:
         try:
             if not pose_q.empty():
                 current_vertices, frame_no = pose_q.get()
-                current_vertices = pre_process(current_vertices)
+                current_vertices = pre_process(current_vertices, steps, args_for_steps)
+                # coordinates = []
+                # for current_vertex in current_vertices:
+                #     for coordinate in current_vertex:
+                #         coordinates.append(np.round(coordinate, 8))
+                # logging.info(coordinates)
                 processed_q_1.put(current_vertices)
                 if for_labelling:
                     processed_q_2.put((current_vertices, frame_no))
@@ -156,3 +188,6 @@ def run_pre_process_steps(pose_q, processed_q_1, processed_q_2, for_labelling=Fa
         except Exception as e:
             logging.error(e)
             break
+
+# References for normalizing
+# S. Agahian et al. / Engineering Science and Technology, an International Journal 23 (2020) 196–203
