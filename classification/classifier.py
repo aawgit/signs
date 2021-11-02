@@ -5,8 +5,9 @@ import pandas as pd
 import pygame
 from scipy.spatial import distance
 
-from feature_extraction.pre_processor import get_angles
-from utils.constants import LABEL_ORDER_CHAMINDA
+from feature_extraction.pre_processor import get_angles, un_flatten_points, get_angle_v2
+from utils.constants import LABEL_ORDER_CHAMINDA, ClassificationMethods, JOINTS_FOR_ANGLES
+from pose_estimation.vertices_mapper import EDGES_MEDIA_PIPE
 
 
 def classifier_by_angles_worker(processed_q):
@@ -41,8 +42,26 @@ def classifier_by_angles_worker(processed_q):
             logging.error(e)
             break
 
+def classify_by_angles(landmark, mean_angles_df):
 
-def classify_land_mark(flattened_coordinates, flattened_mean_coordinates):
+    angles = []
+
+    for joint in JOINTS_FOR_ANGLES:
+        limb2 = [landmark[joint[2]][i] - landmark[joint[1]][i] for i in range(0, 3)]
+        limb1 = [landmark[joint[1]][i] - landmark[joint[0]][i] for i in range(0, 3)]
+        angle = get_angle_v2(limb2, limb1)
+        angles.append(angle)
+
+    mean_angles_df['distance'] = mean_angles_df.drop(['sign','distance'], errors='ignore', axis=1) \
+        .apply(lambda x: distance.euclidean(x, angles), axis=1)
+    matching_signs = mean_angles_df[mean_angles_df['distance'] < 100]
+    if not matching_signs.empty:
+        index_of_sign_with_min_distance = \
+            matching_signs[matching_signs['distance'] == matching_signs['distance'].min()]['sign'].item()
+        sign = LABEL_ORDER_CHAMINDA.get(index_of_sign_with_min_distance)
+        return sign
+
+def classify_by_flat_coordinates(flattened_coordinates, flattened_mean_coordinates):
     flattened_coordinates = list(flattened_coordinates)
     del flattened_coordinates[5]
     del flattened_coordinates[8]
@@ -67,16 +86,40 @@ def classify_land_mark(flattened_coordinates, flattened_mean_coordinates):
         sign = LABEL_ORDER_CHAMINDA.get(index_of_sign_with_min_distance)
         return sign
 
+def get_mean_angles(flattened_mean_coordinates):
+    signs = flattened_mean_coordinates['sign']
+    means_list = flattened_mean_coordinates.drop('sign', axis=1).values.tolist()
+    mean_angles_df_cols = [str(point_pair) for point_pair in JOINTS_FOR_ANGLES]
+    # mean_angles_df_cols.append('sign')
+    mean_angles_df = pd.DataFrame(columns=mean_angles_df_cols)
 
-def classifier_by_vertices_worker(processed_q, means):
-    logging.info('Classifier worker running...')
+    for row in means_list:
+        angles_for_the_row = []
+        row = un_flatten_points(row)
+        for joint in JOINTS_FOR_ANGLES:
+            limb2 = [row[joint[2]][i] - row[joint[1]][i] for i in range(0, 3)]
+            limb1 = [row[joint[1]][i] - row[joint[0]][i] for i in range(0, 3)]
+            reference_angle = get_angle_v2(limb2, limb1)
+            angles_for_the_row.append(reference_angle)
+        row_angles_df = pd.DataFrame([angles_for_the_row], columns=mean_angles_df_cols)
+        mean_angles_df = mean_angles_df.append(row_angles_df)
+    mean_angles_df = pd.concat((mean_angles_df.reset_index(drop=True), signs.rename('sign')), axis=1)
+    return mean_angles_df
+
+
+def classifier_worker(processed_q, means, method):
+    logging.info('Classifier worker running. Method: {}'.format(method))
+    if method == ClassificationMethods.ANGLES:
+        means = get_mean_angles(means)
     previous_sign = None
     while True:
         try:
             if not processed_q.empty():
                 vertices = processed_q.get()
-                # vertices = list(vertices)
-                sign = classify_land_mark(vertices, means)
+                if method==ClassificationMethods.FLAT_COORDINATES:
+                    sign = classify_by_flat_coordinates(vertices, means)
+                elif method == ClassificationMethods.ANGLES:
+                    sign = classify_by_angles(vertices, means)
                 if sign and sign != previous_sign:
                     logging.info('Sign is {}'.format(sign))
                     previous_sign = sign

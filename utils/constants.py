@@ -83,3 +83,24 @@ LABEL_ORDER_CHAMINDA = {
     56: 'KDh',
     57: 'NGDh',
     58: 'RR', }
+
+JOINTS_FOR_ANGLES = [
+    (0, 1, 2),
+    (1, 2, 3),
+    (2, 3, 4),
+    (0, 5, 6),
+    (5, 6, 7),
+    (6, 7, 8),
+    (0, 9, 10),
+    (9, 10, 11),
+    (10, 11, 12),
+    (0, 13, 14),
+    (13, 14, 15),
+    (14, 15, 16),
+    (0, 17, 18),
+    (17, 18, 19),
+    (18, 19, 20)
+]
+class ClassificationMethods:
+    FLAT_COORDINATES='FLAT_COORDINATES'
+    ANGLES = 'ANGLES'

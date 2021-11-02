@@ -112,6 +112,20 @@ def pre_process(land_marks, steps, args_for_steps):
     return tuple(processed)
 
 
+def get_angle_v2(v1, v2):
+    def unit_vector(vector):
+        """ Returns the unit vector of the vector.  """
+        return vector / np.linalg.norm(vector)
+
+    def angle_between(v1, v2):
+        v1_u = unit_vector(v1)
+        v2_u = unit_vector(v2)
+        return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
+    angle = angle_between(v1, v2)
+    return math.degrees(angle)
+
+
 def angle(v1, v2, acute=True):
     v1 = [v1[1][0] - v1[0][0], v1[1][1] - v1[0][1], v1[1][2] - v1[0][2]]
     v2 = [v2[1][0] - v2[0][0], v2[1][1] - v2[0][1], v2[1][2] - v2[0][2]]
@@ -140,6 +154,13 @@ def flatten_points(land_marks: list):
         for coordinate in point:
             flatten_coordinates.append(coordinate)
     return flatten_coordinates
+
+
+def un_flatten_points(flatten_coordinates: list):
+    landmark_points = []
+    for i in range(0, len(flatten_coordinates), 3):
+        landmark_points.append(flatten_coordinates[i:i + 3])
+    return landmark_points
 
 
 def pre_process_single_frame(land_mark):
