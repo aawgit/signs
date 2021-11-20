@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import distance
 
+logging.basicConfig(level=logging.INFO)
 
 def stop_rotation_around_x(frame_vertices, reference_joints):
     point_1 = frame_vertices[reference_joints[0]]
@@ -256,6 +257,7 @@ def pre_process_single_frame(land_mark):
 
 
 def run_pre_process_steps(pose_q, processed_q_1, duplicate_queues=None, for_labelling=False):
+    logging.info('Pre-processing...')
     steps = [
         normalize_movement,
         stop_rotation_around_x,
