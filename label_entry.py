@@ -4,13 +4,8 @@ import logging
 import numpy as np
 import pandas as pd
 
-import pygame
 
-from classification.classifier import KeyInputHolder
-from feature_extraction.pre_processor import get_angles
-
-
-def write_labeled_landmarks_to_csv(processed_q, output_file, no_of_features=21):
+def write_frame_vs_landmarks_to_csv(processed_q, output_file, no_of_features=21):
     logging.info('Writing to file {}'.format(output_file))
     with open(output_file, "w", newline="") as f:
         writer = csv.writer(f)
@@ -20,39 +15,6 @@ def write_labeled_landmarks_to_csv(processed_q, output_file, no_of_features=21):
                 if not processed_q.empty():
                     current_vertices, frame_no = processed_q.get()
                     writer.writerow([frame_no, *current_vertices])
-                else:
-                    pass
-            except Exception as e:
-                logging.error(e)
-                break
-
-
-def labeller_worker(processed_q):
-    logging.info('Labeller worker running...')
-
-    key_input_holder = KeyInputHolder()
-    key_input_holder.set_dummy_window_for_key_press()
-
-    with open("out.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["frame", "thumb_angle", "index_angle", "middle_angle", "ring_angle", "pinky_angle", "label"])
-
-        while True:
-            try:
-                if not processed_q.empty():
-                    vertices, frame_no = processed_q.get()
-                    angles = get_angles(vertices)
-                    label = None
-
-                    for event in pygame.event.get():
-                        if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
-                            key_input_holder.mark_sign()
-
-                        elif event.type == pygame.KEYDOWN and event.key == pygame.K_x:
-                            key_input_holder.clear_sign()
-
-                    if key_input_holder.get_is_label(): label = key_input_holder.get_current_label()
-                    writer.writerow([frame_no, *angles, label])
                 else:
                     pass
             except Exception as e:

@@ -6,7 +6,7 @@ import pygame
 
 from utils.constants import EDGES_CUBE, VERTICES_CUBE
 from pose_estimation.vertices_mapper import EDGES_MEDIA_PIPE, VERTICES_DEFAULT_MP
-from feature_extraction.pre_processor import get_angles, pre_process
+# from feature_extraction.pre_processor import get_angles, pre_process
 
 from scipy.spatial import distance
 
@@ -107,6 +107,52 @@ def drawText(position, textString):
     glRasterPos3d(*position)
     glDrawPixels(textSurface.get_width(), textSurface.get_height(), GL_RGBA, GL_UNSIGNED_BYTE, textData)
 
+def render_static_and_dynamic(queue, land_mark):
+    pygame.init()
+    display = (800, 600)
+    pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
+
+    gluPerspective(45, (display[0] / display[1]), 0.1, 50.0)
+
+    glTranslatef(0.0, 0.0, -5)
+
+    glRotatef(90, 0, 0, 0)
+
+    while True:
+        try:
+            current_edges = EDGES_MEDIA_PIPE
+            if not queue.empty():
+                current_vertices = queue.get()
+                LAST_VERTICES[0] = current_vertices
+
+            else:
+                last_vertices_local = LAST_VERTICES[0]
+                current_vertices = last_vertices_local
+
+
+        except Exception as e:
+            logging.error('Error: {}'.format(e))
+            current_vertices = VERTICES_CUBE
+            current_edges = EDGES_CUBE
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+
+        current_vertices_2 = land_mark
+        current_edges2 = EDGES_MEDIA_PIPE
+
+        glRotatef(1, 0, 1, 0)
+        # TODO: Remove this after pre-processing testing
+        # current_vertices = pre_process(current_vertices)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        hand_model(current_vertices, current_edges)
+        hand_model(current_vertices_2, current_edges2, color=(0.5, 0.5, 1.0))
+        # display_info(current_vertices)
+        draw_axes()
+        pygame.display.flip()
+        pygame.time.wait(10)
 
 def render(queue):
     pygame.init()
@@ -182,7 +228,7 @@ def render_static_2_hands(land_mark_1, land_mark_2):
         hand_model(current_vertices_2, current_edges, color=(0.5, 0.5, 1.0))
 
         draw_axes()
-        glRotatef(1, 0, 1, 0)
+        glRotatef(0.5, 0, 1, 0)
         pygame.display.flip()
         pygame.time.wait(10)
 

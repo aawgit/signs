@@ -67,6 +67,8 @@ def dynamic_images(queue, callback, file=None):
             image.flags.writeable = False
             results = hands.process(image)
 
+            callback(queue, results, frame_no)
+
             # Added content
             frame_land_marks = []
             if results.multi_hand_landmarks:  # returns None if hand is not found
@@ -81,7 +83,7 @@ def dynamic_images(queue, callback, file=None):
                     frame_land_marks.append(landMark)
                 # if draw:
                 #   mpDraw.draw_landmarks(originalImage, hand, mpHands.HAND_CONNECTIONS)
-                callback(queue, frame_land_marks, frame_no)
+
             #
 
             # Draw the hand annotations on the image.

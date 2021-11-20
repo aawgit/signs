@@ -24,7 +24,7 @@ VERTICES_CUBE = (
     (-1, 1, 1)
 )
 
-LABEL_ORDER_CHAMINDA = {
+LABEL_VS_INDEX = {
     1: 'A අ',
     2: 'AA ආ',
     3: 'AE ඇ',
@@ -62,7 +62,7 @@ LABEL_ORDER_CHAMINDA = {
     35: 'NDh ඳ',
     36: 'MB ඹ්',
     37: 'KH ඛ්',
-    38: 'GH ඝ්', # TODO: Revisit from here
+    38: 'GH ඝ්',  # TODO: Revisit from here
     39: 'DH ඪ්',
     40: 'PH ඵ්',
     41: 'DhH ධ්',
@@ -85,6 +85,8 @@ LABEL_ORDER_CHAMINDA = {
     58: 'RR', }
 
 JOINTS_FOR_ANGLES = [
+    (17, 5, 1),
+    (0, 5, 1),
     (0, 1, 2),
     (1, 2, 3),
     (2, 3, 4),
@@ -101,6 +103,9 @@ JOINTS_FOR_ANGLES = [
     (17, 18, 19),
     (18, 19, 20)
 ]
+
+
 class ClassificationMethods:
-    FLAT_COORDINATES='FLAT_COORDINATES'
+    FLAT_COORDINATES = 'FLAT_COORDINATES'
     ANGLES = 'ANGLES'
+    ANGLES_AND_FLAT_CO = 'ANGLES_AND_FLAT_COORDINATES'

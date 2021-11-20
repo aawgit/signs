@@ -1,26 +1,20 @@
 import cv2
 import mediapipe as mp
 
+from utils.video_utils import get_static_frame
+# from pose_estimation.interfacer import mp_callback_static
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
 
 CV_CAP_PROP_POS_FRAMES = 1
 
-def get_estimation_for_frame(video_file, seconds):
-    image = get_static_frame(video_file, seconds)
-    land_marks = static_images(image)
-    frame_vertices = [(land_mark.x, land_mark.y * (-1), land_mark.z) for land_mark in land_marks]
-    return frame_vertices
+# def get_estimation_for_frame(video_file, seconds, fps):
+#     image = get_static_frame(video_file, seconds, fps=fps)
+#     land_marks = static_images(image, mp_callback_static)
+#     frame_vertices = [(land_mark.x, land_mark.y * (-1), land_mark.z) for land_mark in land_marks]
+#     return frame_vertices
 
-def get_static_frame(video_file, seconds, fps=29.970030):
-    cap = cv2.VideoCapture(video_file)
-    frame_no = seconds * fps
-    cap.set(1, frame_no)
-    res, frame = cap.read()
-    cap.release()
-    return frame
-
-def static_images(image):
+def static_images(image, callback):
     # For static images:
     with mp_hands.Hands(
             static_image_mode=True,
@@ -33,20 +27,8 @@ def static_images(image):
         # Print handedness and draw hand landmarks on the image.
 
         # Added content
-        frame_land_marks = []
-        if results.multi_hand_landmarks:  # returns None if hand is not found
-            hand = results.multi_hand_landmarks[
-                0]  # results.multi_hand_landmarks returns landMarks for all the hands
 
-            for id, landMark in enumerate(hand.landmark):
-                # landMark holds x,y,z ratios of single landmark
-                # imgH, imgW, imgC = originalImage.shape  # height, width, channel for image
-                # xPos, yPos = int(landMark.x * imgW), int(landMark.y * imgH)
-                # landMarkList.append([id, xPos, yPos])
-                frame_land_marks.append(landMark)
-            # if draw:
-            #   mpDraw.draw_landmarks(originalImage, hand, mpHands.HAND_CONNECTIONS)
-        return frame_land_marks
+        return callback(results)
 
 
 def dynamic_images(queue, callback, file=None):
