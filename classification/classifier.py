@@ -4,6 +4,7 @@ from itertools import chain
 import pandas as pd
 import pygame
 from scipy.spatial import distance
+from sklearn import tree
 
 from feature_extraction.pre_processor import un_flatten_points, get_angle_v2, normalize_flat_coordinates_scale
 from utils.constants import LABEL_VS_INDEX, JOINTS_FOR_ANGLES
@@ -25,7 +26,7 @@ class NearestNeighborPoseClassifier:
         # logging.info(incoming_frame)
         self.cluster_means['distance'] = self.cluster_means.drop(['sign', 'distance'], errors='ignore', axis=1) \
             .apply(lambda x: distance.euclidean(x, incoming_frame), axis=1)
-        candidates_df = self.cluster_means.nsmallest(5, 'distance').sort_values(by=['distance'])[self.cluster_means.distance<2.5]
+        candidates_df = self.cluster_means.nsmallest(5, 'distance').sort_values(by=['distance'])[self.cluster_means.distance<5]
         candidates_df['class'] = candidates_df['sign'].apply(lambda x: LABEL_VS_INDEX.get(x))
 
         joint_wise_deviation = (candidates_df.drop(['sign', 'distance', 'class'], axis=1) - incoming_frame).abs()
@@ -61,7 +62,7 @@ class ClassifierByFlatCoordinates(NearestNeighborPoseClassifier):
         super().__init__(cluster_means, threshold)
 
     def unify_cluster_mean_features(self, cluster_means: pd.DataFrame):
-        cluster_means = normalize_flat_coordinates_scale(cluster_means)
+        # cluster_means = normalize_flat_coordinates_scale(cluster_means)
         if self.vertices_to_ignore:
             cols_to_drop = []
             for vertex in self.vertices_to_ignore:
@@ -71,7 +72,7 @@ class ClassifierByFlatCoordinates(NearestNeighborPoseClassifier):
             unified_cluster_means = cluster_means.drop(cols_to_drop, errors='ignore', axis=1)
         else:
             unified_cluster_means = cluster_means
-        return unified_cluster_means
+        return unified_cluster_means.reset_index(drop=True)
 
     def unify_frame_features(self, landmark):
         landmark = list(landmark)
@@ -100,10 +101,10 @@ class ClassifierByAngles(NearestNeighborPoseClassifier):
                 limb2 = [row[joint[2]][i] - row[joint[1]][i] for i in range(0, 3)]
                 limb1 = [row[joint[1]][i] - row[joint[0]][i] for i in range(0, 3)]
                 reference_angle = get_angle_v2(limb2, limb1)
-                angles_for_the_row.append(reference_angle / 90)
+                angles_for_the_row.append((reference_angle-90) / 90)
             row_angles_df = pd.DataFrame([angles_for_the_row], columns=mean_angles_df_cols)
             mean_angles_df = mean_angles_df.append(row_angles_df)
-        mean_angles_df = pd.concat((mean_angles_df.reset_index(drop=True), signs.rename('sign')), axis=1)
+        mean_angles_df = pd.concat((mean_angles_df.reset_index(drop=True), signs.rename('sign').reset_index(drop=True)), axis=1).drop('index', axis=1, errors='ignore')
         return mean_angles_df
 
     def unify_frame_features(self, landmark):
@@ -112,7 +113,7 @@ class ClassifierByAngles(NearestNeighborPoseClassifier):
             limb2 = [landmark[joint[2]][i] - landmark[joint[1]][i] for i in range(0, 3)]
             limb1 = [landmark[joint[1]][i] - landmark[joint[0]][i] for i in range(0, 3)]
             angle = get_angle_v2(limb2, limb1)
-            angles.append(angle / 90)
+            angles.append((angle-90) / 90)
 
         return angles
 
@@ -125,9 +126,9 @@ class ClassifierByAnglesAndCoordinates(NearestNeighborPoseClassifier):
         super().__init__(cluster_means, 2)
 
     def unify_cluster_mean_features(self, cluster_means):
-        unified_coordinates = self.coordinateClassifier.cluster_means
+        unified_coordinates = self.coordinateClassifier.cluster_means.drop('sign', axis=1)
         unified_angles = self.angleClassifier.cluster_means
-        unified_co_and_angle = pd.merge(unified_coordinates, unified_angles, on='sign')
+        unified_co_and_angle = pd.concat([unified_coordinates, unified_angles], axis=1)
         return unified_co_and_angle
 
     def unify_frame_features(self, landmark):
@@ -136,6 +137,18 @@ class ClassifierByAnglesAndCoordinates(NearestNeighborPoseClassifier):
         unified_coordinates.extend(unified_angles)
         return unified_coordinates
 
+class DecisionTreeClassifier(ClassifierByAnglesAndCoordinates):
+    def __init__(self, cluster_means: pd.DataFrame, threshold, vertices_to_ignore=None):
+        super().__init__(cluster_means, threshold)
+        self.X = self.cluster_means.drop('sign', axis=1)
+        self.Y = self.cluster_means['sign']
+        self.clf = tree.DecisionTreeClassifier()
+        self.clf.fit(self.X, self.Y)
+
+
+    def classify(self, landmark):
+        incoming_frame = self.unify_frame_features(landmark)
+        self.clf.predict([incoming_frame])
 
 class KeyInputHolder:
     def __init__(self):

@@ -36,6 +36,11 @@ pose estimation error correction by restricting poses considering DoF
 
 normalize the width? yes + limb size -> consider max deviation for each angle -> 2 dof of thumb
 
+
+Try different classifiers - decision tree, random forest
+
+limitation is in the pose estimator. So create multiple data points for same sign for different estimations. (varying angle, lighting)
+
 - note results with angles
 - give more weight to angles (when using coordinates + angles)
 - inspect angle measurement accuracy, and definition, specially check thumb angle

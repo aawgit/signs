@@ -14,18 +14,24 @@ def get_saved_land_mark(sign, sign_file_df):
     return land_mark
 
 if __name__ == '__main__':
-    means_file = './data/training/means_cham_vertices_28_10_21_2_i-replaced.csv'
+    means_file = './data/training/reference_signs_1-21-11-21.csv'
     means = pd.read_csv(means_file)
+
+    means_file_2 = './data/training/reference_signs_21-11-21.csv'
+    means2 = pd.read_csv(means_file_2)
 
     video_m = video_meta.get(4)
     video = video_m.get('location')
     fps = video_m.get('fps')
 
-    time = 4*60 + 3.7
+    time = 4*60 + 16
 
-    saved_lm = get_saved_land_mark(14, means)
+    saved_lm = get_saved_land_mark(16, means)
     saved_lm = pre_process_single_frame(saved_lm)
     # render_static(saved_lm)
+
+    saved_lm2 = get_saved_land_mark(16, means2)
+    # saved_lm = pre_process_single_frame(saved_lm)
 
     image = get_static_frame(video, time, fps=fps)
     land_marks = mp_estimate_pose_static(image)
@@ -33,4 +39,4 @@ if __name__ == '__main__':
 
     # render_static(land_marks)
 
-    render_static_2_hands(land_marks, saved_lm)
+    render_static_2_hands(land_marks, saved_lm2)

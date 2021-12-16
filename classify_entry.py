@@ -5,7 +5,7 @@ import threading
 import pandas as pd
 
 from classification.classifier import ClassifierByFlatCoordinates, ClassifierByAngles, \
-    ClassifierByAnglesAndCoordinates
+    ClassifierByAnglesAndCoordinates, DecisionTreeClassifier
 from feature_extraction.pre_processor import run_pre_process_steps, pre_process_single_frame, un_flatten_points
 from feature_extraction.renderer import render, render_static, render_static_2_hands, render_static_and_dynamic
 from pose_estimation.interfacer import mp_estimate_pose, mp_estimate_pose_static
@@ -54,10 +54,16 @@ def process_single_frame(video_file, seconds, fps, classify=False, method=Classi
 
 def _get_training_data():
     # TODO: Rename
-    means_file = './data/training/means_cham_vertices_28_10_21_2_i-replaced.csv'
-    means = pd.read_csv(means_file)
-    return means
+    means_file = './data/training/reference_signs_1-21-11-21.csv'
+    means: pd.DataFrame = pd.read_csv(means_file)
 
+    means_file_2 = './data/training/reference_signs_21-11-21.csv'
+    means2 = pd.read_csv(means_file_2)
+    # return means
+
+    means.append(means2)
+    return means.append(means2)
+    # return means
 
 def classifier_worker(processed_q, means, method):
     logging.info('Classifier worker running. Method: {}'.format(method))
@@ -105,6 +111,16 @@ if __name__ == '__main__':
 
     time = 4*60 + 16
 
-    process_single_frame(video, time, fps, classify=True, method=ClassificationMethods.ANGLES_AND_FLAT_CO)
+    # process_single_frame(video, time, fps, classify=True, method=ClassificationMethods.ANGLES_AND_FLAT_CO)
 
-    # process_video(video, classify=True, method=ClassificationMethods.ANGLES_AND_FLAT_CO)
+    process_video(classify=True, method=ClassificationMethods.ANGLES_AND_FLAT_CO)
+
+    # means = _get_training_data()
+    # classifier = DecisionTreeClassifier(means, 2)
+    #
+    # image = get_static_frame(video, time, fps=fps)
+    # land_marks = mp_estimate_pose_static(image)
+    # land_marks = pre_process_single_frame(land_marks)
+    #
+    # out_put = classifier.classify(land_marks)
+    # logging.info(out_put)

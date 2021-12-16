@@ -1,6 +1,7 @@
 import csv
 import logging
 import multiprocessing
+import threading
 
 import numpy as np
 import pandas as pd
@@ -9,7 +10,7 @@ import cv2
 from utils.video_utils import video_meta
 from pose_estimation.interfacer import mp_estimate_pose_static
 
-from feature_extraction.pre_processor import run_pre_process_steps, pre_process_single_frame, un_flatten_points
+from feature_extraction.pre_processor import run_pre_process_steps, pre_process_single_frame, flatten_points
 from feature_extraction.renderer import render, render_static, render_static_2_hands, render_static_and_dynamic
 from pose_estimation.interfacer import mp_estimate_pose, mp_estimate_pose_static
 from utils.constants import ClassificationMethods
@@ -111,8 +112,18 @@ def image_and_estimation(video, callback):
 
     pool.apply_async(render, (pre_processed_q_1,))
 
+    threading.Thread(target=display_coordinates, args=(pre_processed_q_2, ), daemon=True).start()
+
     video_position_selector(video, callback, hand_pose_q)
 
+def display_coordinates(queue):
+    while True:
+        try:
+            if not queue.empty():
+                current_vertices = queue.get()
+                logging.info(flatten_points(current_vertices))
+        except Exception as e:
+            break
 
 def callback(img, frame_no, queue):
     logging.info(frame_no)
@@ -123,7 +134,7 @@ def callback(img, frame_no, queue):
 
 
 if __name__ == '__main__':
-    video_m = video_meta.get(1)
+    video_m = video_meta.get(2)
     video = video_m.get('location')
     fps = video_m.get('fps')
 

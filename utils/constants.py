@@ -62,7 +62,7 @@ LABEL_VS_INDEX = {
     35: 'NDh ඳ',
     36: 'MB ඹ්',
     37: 'KH ඛ්',
-    38: 'GH ඝ්',  # TODO: Revisit from here
+    38: 'GH ඝ්',
     39: 'DH ඪ්',
     40: 'PH ඵ්',
     41: 'DhH ධ්',
@@ -86,7 +86,7 @@ LABEL_VS_INDEX = {
 
 JOINTS_FOR_ANGLES = [
     (17, 5, 1),
-    (0, 5, 1),
+    (0, 9, 1),
     (0, 1, 2),
     (1, 2, 3),
     (2, 3, 4),
