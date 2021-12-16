@@ -4,38 +4,12 @@ import ast
 
 import pandas as pd
 import numpy as np
-# from scipy.spatial import distance
-from sklearn.cluster import KMeans
-# from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
-# from PIL import Image
-import matplotlib.pyplot as plt
+from scipy.spatial import distance
+# from sklearn.cluster import KMeans
+# import matplotlib.pyplot as plt
+from feature_extraction.pre_processor import pre_process
 
-
-# from feature_extraction.pre_processor import pre_process
-# from feature_extraction.static_image_processor import static_images
-
-
-def create_labels(data_by_frame_file, output_file):
-    # TODO: Add dynamic or not
-    labels = pd.read_csv('./data/training/labels_Chaminda .csv')
-    land_mark_points = pd.read_csv(data_by_frame_file)
-
-    labels.start = labels.apply(lambda row: int(row.start * 29.97), axis=1)
-    labels.end = labels.apply(lambda row: int(row.end * 29.97), axis=1)
-
-    # TODO: More efficient way of merging the two dfs
-    sign_count = len(labels.sign)
-
-    def get_label(t):
-        filtered_id_series = ((t >= labels.start) & (t <= labels.end))
-        if filtered_id_series.any():
-            label_idx = filtered_id_series.dot(np.arange(sign_count))
-            return int(labels.sign[label_idx])
-
-    land_mark_points["sign"] = land_mark_points.frame.transform(get_label)
-    land_mark_points = land_mark_points[land_mark_points['sign'].notna()]
-    merged = pd.merge(land_mark_points, labels, on='sign', how='left')
-    merged.to_csv(output_file, index=False)
+from pose_estimation.media_pipe_static_estimator import static_images
 
 
 def add_dynamic_or_not():
@@ -48,8 +22,8 @@ def add_dynamic_or_not():
 
 def edge_cleaned_mean(x):
     length = len(x)
-    starting = int(length * .1)
-    ending = int(length * .9)
+    starting = int(length * .2)
+    ending = int(length * .8)
     x = x.iloc[starting:ending].mean()
     return x
 
@@ -177,10 +151,7 @@ def get_variance(mean_land_mark, land_marks):
     variances = squares.sum(axis=0) / distance.shape[0]
     return variances
 
-
-def cluster_kmeans():
-    land_marks = pd.read_csv('data/training/ego_hands_land_marks.csv',
-                             converters={"0": ast.literal_eval,
+converter={"0": ast.literal_eval,
                                          "1": ast.literal_eval,
                                          "2": ast.literal_eval,
                                          "3": ast.literal_eval,
@@ -201,7 +172,11 @@ def cluster_kmeans():
                                          "18": ast.literal_eval,
                                          "19": ast.literal_eval,
                                          "20": ast.literal_eval,
-                                         })
+                                         }
+
+def cluster_kmeans():
+    land_marks = pd.read_csv('data/training/ego_hands_land_marks.csv',
+                             converters=converter)
     # mean_land_marks = group_by_sign_and_mean(land_marks)
 
     flat_features = split_points_to_coordinates(land_marks)
@@ -245,9 +220,11 @@ def split_points_to_coordinates(land_marks: pd.DataFrame):
     return new_df
 
 if __name__ == '__main__':
-
-    land_marks = pd.read_csv('./data/training/vertices_labels_chaminda-processed.csv')
-
+    land_mark_vs_label = pd.read_csv('./data/training/sign_vs_landmark_t01.csv', converters=converter).drop(['frame', 'sign_character'], axis=1, errors='ignore')
+    land_mark_vs_label = land_mark_vs_label[land_mark_vs_label.dynamic!=1].drop(['dynamic'], axis=1, errors='ignore')
+    land_mark_vs_label = split_points_to_coordinates(land_mark_vs_label)
+    means = land_mark_vs_label.groupby('sign').agg(edge_cleaned_mean)
+    means.to_csv('./data/training/means_cham_vertices_28_10_21_1.csv')
 
     # add_dynamic_or_not()
     # angles_and_labels = pd.read_csv('./data/training/angles_labels_chaminda_3.csv')
@@ -260,7 +237,6 @@ if __name__ == '__main__':
 
     # Ego hands
     # land_marks = get_land_marks(list(range(1, 10)), list(range(24, 36)), list(range(1, 7)))
-
 
     # distances2 = distance_from_mean(mean_land_mark, land_marks)
     x = 5

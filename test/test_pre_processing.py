@@ -1,3 +1,4 @@
+from feature_extraction.pre_processor import get_angle_v2
 def test_rotation():
     vertices = [(0.0, 0.0, 0.0),
                 (0.494931877409792, 0.06352074855624598, 0.34365336068146485),
@@ -20,3 +21,21 @@ def test_rotation():
                 (0.5518376222461113, 0.7192377798276867, -0.7531665396810316),
                 (0.712010096144453, 0.8550425776047149, -0.8452783773753918),
                 (0.8582676344036527, 0.9898679827714314, -0.9188083667001632)]
+
+def test_get_angle_v2():
+    line1 = ((0,0), (1,1))
+    line2 = ((1,1), (0,1))
+
+    v1 = [line1[1][i] - line1[0][i] for i in range(0,2)]
+    v2 = [line2[1][i] - line2[0][i] for i in range(0, 2)]
+    angle = get_angle_v2(v1, v2)
+    assert angle == 45
+
+    line1 = ((0, 0, 0), (0, 1, 1))
+    line2 = ((0, 1, 1), (0, 2, 0))
+
+    v1 = [line1[1][i] - line1[0][i] for i in range(0, 3)]
+    v2 = [line2[1][i] - line2[0][i] for i in range(0, 3)]
+    angle = get_angle_v2(v1, v2)
+    assert angle == 90
+

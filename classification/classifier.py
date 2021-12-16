@@ -1,119 +1,154 @@
-import csv
 import logging
 from itertools import chain
 
 import pandas as pd
 import pygame
 from scipy.spatial import distance
+from sklearn import tree
 
-from feature_extraction.pre_processor import get_angles
-from utils.constants import LABEL_ORDER_CHAMINDA
-
-
-def labeller_worker(processed_q):
-    logging.info('Labeller worker running...')
-
-    key_input_holder = KeyInputHolder()
-    key_input_holder.set_dummy_window_for_key_press()
-
-    with open("out.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["frame", "thumb_angle", "index_angle", "middle_angle", "ring_angle", "pinky_angle", "label"])
-
-        while True:
-            try:
-                if not processed_q.empty():
-                    vertices, frame_no = processed_q.get()
-                    angles = get_angles(vertices)
-                    label = None
-
-                    for event in pygame.event.get():
-                        if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
-                            key_input_holder.mark_sign()
-
-                        elif event.type == pygame.KEYDOWN and event.key == pygame.K_x:
-                            key_input_holder.clear_sign()
-
-                    if key_input_holder.get_is_label(): label = key_input_holder.get_current_label()
-                    writer.writerow([frame_no, *angles, label])
-                else:
-                    pass
-            except Exception as e:
-                logging.error(e)
-                break
+from feature_extraction.pre_processor import un_flatten_points, get_angle_v2, normalize_flat_coordinates_scale
+from utils.constants import LABEL_VS_INDEX, JOINTS_FOR_ANGLES
 
 
-def classifier_by_angles_worker(processed_q):
-    logging.info('Classifier worker running...')
+class NearestNeighborPoseClassifier:
+    def __init__(self, cluster_means: pd.DataFrame, threshold):
+        self.cluster_means = self.unify_cluster_mean_features(cluster_means)
+        self.threshold = threshold
 
-    means = pd.read_csv('./data/training/means.csv')[['thumb_angle', 'index_angle', 'middle_angle',
-                                                      'ring_angle', 'pinky_angle', 'label']]
+    def unify_cluster_mean_features(self, cluster_means):
+        pass
 
-    def calculate_distance(th, ind, mi, ri, pi, angles):
-        return distance.euclidean([th, ind, mi, ri, pi], angles)
+    def unify_frame_features(self, landmark):
+        pass
 
-    previous_sign = None
-    while True:
-        try:
-            if not processed_q.empty():
-                vertices, frame_no = processed_q.get()
-                angles = get_angles(vertices)
-                means['distance'] = means.apply(lambda x: calculate_distance(x.thumb_angle, x.index_angle,
-                                                                             x.middle_angle, x.ring_angle,
-                                                                             x.pinky_angle, angles), axis=1)
-                matching_signs = means[means['distance'] < 20]
-                if not matching_signs.empty:
-                    index_of_sign_with_min_distance = \
-                        matching_signs[matching_signs['distance'] == matching_signs['distance'].min()]['label'].item()
-                    sign = LABEL_ORDER_CHAMINDA.get(index_of_sign_with_min_distance)
-                    if sign != previous_sign:
-                        logging.info('Sign is {}'.format(sign))
-                        previous_sign = sign
-            else:
-                pass
-        except Exception as e:
-            logging.error(e)
-            break
+    def classify(self, landmark):
+        incoming_frame = self.unify_frame_features(landmark)
+        # logging.info(incoming_frame)
+        self.cluster_means['distance'] = self.cluster_means.drop(['sign', 'distance'], errors='ignore', axis=1) \
+            .apply(lambda x: distance.euclidean(x, incoming_frame), axis=1)
+        candidates_df = self.cluster_means.nsmallest(5, 'distance').sort_values(by=['distance'])[self.cluster_means.distance<5]
+        candidates_df['class'] = candidates_df['sign'].apply(lambda x: LABEL_VS_INDEX.get(x))
+
+        joint_wise_deviation = (candidates_df.drop(['sign', 'distance', 'class'], axis=1) - incoming_frame).abs()
+        max_deviations = joint_wise_deviation.apply('max', axis=1)
+        alternative = candidates_df.loc[max_deviations.idxmin()]['class']
+        logging.info('Alternative: {}'.format(alternative))
+        #
+        # lowest = max_deviations.iloc[0]
+        # for deviation in max_deviations:
+        #     if deviation<lowest:
+        #         lowest = deviation
+        #         break
+        #     lowest = deviation
+        #
+        # return candidates_df[max_deviations == lowest][['class', 'distance']].to_dict('records')
 
 
-def classifier_by_vertices_worker(processed_q):
-    logging.info('Classifier worker running...')
+        return candidates_df[['class', 'distance']].to_dict('records')
+        # TODO: Re-evaluate the necessity for limiting the distance
+        # matching_signs = self.cluster_means[self.cluster_means['distance'] < self.threshold]
+        # if not matching_signs.empty:
+        #     index_of_sign_with_min_distance = \
+        #         matching_signs[matching_signs['distance'] == matching_signs['distance'].min()]['sign'].item()
+        #     sign = LABEL_ORDER_CHAMINDA.get(index_of_sign_with_min_distance)
+        #     return sign
 
-    means = pd.read_csv('./data/training/vertices_means_chaminda.csv')
 
-    previous_sign = None
-    while True:
-        try:
-            if not processed_q.empty():
-                vertices, frame_no = processed_q.get()
-                vertices = list(vertices)
-                del vertices[5]
-                del vertices[8]
-                del vertices[11]
-                del vertices[14]
-                vertices = list(chain(*vertices[1:]))
-                means = means[means.sign != 32]
-                means['distance'] = means.drop([
-                    'sign',
-                    'distance',
-                    '5_0', '5_1', '5_2',
-                    '9_0', '9_1', '9_2',
-                    '13_0', '13_1', '13_2',
-                    '17_0', '17_1', '17_2',],errors='ignore', axis=1)\
-                    .apply(lambda x: distance.euclidean(x, vertices), axis=1)
-                matching_signs = means[means['distance'] < 2]
-                if not matching_signs.empty:
-                    index_of_sign_with_min_distance = \
-                        matching_signs[matching_signs['distance'] == matching_signs['distance'].min()]['sign'].item()
-                    sign = LABEL_ORDER_CHAMINDA.get(index_of_sign_with_min_distance)
-                    if sign != previous_sign:
-                        logging.info('Sign is {}'.format(sign))
-                        previous_sign = sign
-            else:
-                pass
-        except Exception as e:
-            logging.error(e)
-            break
+class ClassifierByFlatCoordinates(NearestNeighborPoseClassifier):
+    def __init__(self, cluster_means: pd.DataFrame, threshold, vertices_to_ignore=None):
+        if vertices_to_ignore is None:
+            vertices_to_ignore = [0, 5, 9, 13, 17]
+        self.vertices_to_ignore = vertices_to_ignore
+        super().__init__(cluster_means, threshold)
+
+    def unify_cluster_mean_features(self, cluster_means: pd.DataFrame):
+        # cluster_means = normalize_flat_coordinates_scale(cluster_means)
+        if self.vertices_to_ignore:
+            cols_to_drop = []
+            for vertex in self.vertices_to_ignore:
+                for i in range(0, 3):
+                    cols_to_drop.append('{}_{}'.format(vertex, i))
+
+            unified_cluster_means = cluster_means.drop(cols_to_drop, errors='ignore', axis=1)
+        else:
+            unified_cluster_means = cluster_means
+        return unified_cluster_means.reset_index(drop=True)
+
+    def unify_frame_features(self, landmark):
+        landmark = list(landmark)
+        if self.vertices_to_ignore:
+            for idx, vertex in enumerate(self.vertices_to_ignore):
+                del landmark[vertex - idx]
+        flattened_coordinates = list(chain(*landmark))
+        return flattened_coordinates
+
+
+class ClassifierByAngles(NearestNeighborPoseClassifier):
+    def __init__(self, cluster_means: pd.DataFrame, vertices_to_ignore=None):
+        self.vertices_to_ignore = vertices_to_ignore
+        super().__init__(cluster_means, 2)
+
+    def unify_cluster_mean_features(self, cluster_means):
+        signs = cluster_means['sign']
+        means_list = cluster_means.drop('sign', axis=1).values.tolist()
+        mean_angles_df_cols = [str(point_pair) for point_pair in JOINTS_FOR_ANGLES]
+        mean_angles_df = pd.DataFrame(columns=mean_angles_df_cols)
+
+        for row in means_list:
+            angles_for_the_row = []
+            row = un_flatten_points(row)
+            for joint in JOINTS_FOR_ANGLES:
+                limb2 = [row[joint[2]][i] - row[joint[1]][i] for i in range(0, 3)]
+                limb1 = [row[joint[1]][i] - row[joint[0]][i] for i in range(0, 3)]
+                reference_angle = get_angle_v2(limb2, limb1)
+                angles_for_the_row.append((reference_angle-90) / 90)
+            row_angles_df = pd.DataFrame([angles_for_the_row], columns=mean_angles_df_cols)
+            mean_angles_df = mean_angles_df.append(row_angles_df)
+        mean_angles_df = pd.concat((mean_angles_df.reset_index(drop=True), signs.rename('sign').reset_index(drop=True)), axis=1).drop('index', axis=1, errors='ignore')
+        return mean_angles_df
+
+    def unify_frame_features(self, landmark):
+        angles = []
+        for joint in JOINTS_FOR_ANGLES:
+            limb2 = [landmark[joint[2]][i] - landmark[joint[1]][i] for i in range(0, 3)]
+            limb1 = [landmark[joint[1]][i] - landmark[joint[0]][i] for i in range(0, 3)]
+            angle = get_angle_v2(limb2, limb1)
+            angles.append((angle-90) / 90)
+
+        return angles
+
+
+class ClassifierByAnglesAndCoordinates(NearestNeighborPoseClassifier):
+    def __init__(self, cluster_means: pd.DataFrame, threshold, vertices_to_ignore=None):
+        self.vertices_to_ignore = vertices_to_ignore
+        self.coordinateClassifier = ClassifierByFlatCoordinates(cluster_means, threshold, vertices_to_ignore)
+        self.angleClassifier = ClassifierByAngles(cluster_means, threshold)
+        super().__init__(cluster_means, 2)
+
+    def unify_cluster_mean_features(self, cluster_means):
+        unified_coordinates = self.coordinateClassifier.cluster_means.drop('sign', axis=1)
+        unified_angles = self.angleClassifier.cluster_means
+        unified_co_and_angle = pd.concat([unified_coordinates, unified_angles], axis=1)
+        return unified_co_and_angle
+
+    def unify_frame_features(self, landmark):
+        unified_coordinates = self.coordinateClassifier.unify_frame_features(landmark)
+        unified_angles = self.angleClassifier.unify_frame_features(landmark)
+        unified_coordinates.extend(unified_angles)
+        return unified_coordinates
+
+class DecisionTreeClassifier(ClassifierByAnglesAndCoordinates):
+    def __init__(self, cluster_means: pd.DataFrame, threshold, vertices_to_ignore=None):
+        super().__init__(cluster_means, threshold)
+        self.X = self.cluster_means.drop('sign', axis=1)
+        self.Y = self.cluster_means['sign']
+        self.clf = tree.DecisionTreeClassifier()
+        self.clf.fit(self.X, self.Y)
+
+
+    def classify(self, landmark):
+        incoming_frame = self.unify_frame_features(landmark)
+        self.clf.predict([incoming_frame])
 
 class KeyInputHolder:
     def __init__(self):
@@ -123,7 +158,7 @@ class KeyInputHolder:
     def mark_sign(self):
         self.count = self.count + 1
         self.is_label = True
-        logging.info('Current sign {} '.format(LABEL_ORDER_CHAMINDA.get(self.count)))
+        logging.info('Current sign {} '.format(LABEL_VS_INDEX.get(self.count)))
 
     def clear_sign(self):
         self.is_label = False
@@ -142,3 +177,5 @@ class KeyInputHolder:
         windowSurface = pygame.display.set_mode((WIDTH, HEIGHT), 0, 32)
 
         windowSurface.fill(BLACK)
+
+
