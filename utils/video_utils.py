@@ -36,16 +36,23 @@ def get_static_frame(video_file, seconds, fps=29.970030):
 
 
 video_meta = {
-    1: dict(location="./data/video/SLSL - Sinhala Sign Alphabet - Sri Lankan Sign Language - Chaminda Hewapathirana.mp4",
-            fps=29.97),
+    1: dict(
+        location="./data/video/SLSL - Sinhala Sign Alphabet - Sri Lankan Sign Language - Chaminda Hewapathirana.mp4",
+        fps=29.97),
     2: dict(location="./data/video/yt1s.com - SLSL1Sinhala Manual Alphabet_360p.mp4",
             fps=29.97),
-    3: dict(location="./data/video/buddika/a-uu.mp4",
-            fps=29.59),
-    4: dict(location="./data/video/Geshani.mp4",
+
+    3: dict(location="./data/video/Geshani.mp4",
             fps=20),
-    5: dict(location= "/home/aka/Downloads/ego hands dataset/videos_1/Subject04/Scene2/Color/rgb2.avi",
-            fps=30)
+    4: dict(location="./data/video/Samantha.mp4",
+            fps=30),
+    5: dict(location="./data/video/ahanna_youtube/th.mp4",
+            fps=25),
+    6: dict(location="/home/aka/Downloads/ego hands dataset/videos_1/Subject04/Scene2/Color/rgb2.avi",
+            fps=30),
+    7: dict(location="./data/video/buddika/e-N.mp4",
+            fps=29.59),
+    8: dict(location="./data/video/ref/right/f.mp4", fps=30)
 }
 
 if __name__ == '__main__':

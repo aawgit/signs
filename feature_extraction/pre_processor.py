@@ -6,9 +6,13 @@ from scipy.spatial import distance
 
 logging.basicConfig(level=logging.INFO)
 
+
 def stop_rotation_around_x(frame_vertices, reference_joints):
     point_1 = frame_vertices[reference_joints[0]]
-    point_2 = frame_vertices[reference_joints[1]]
+    # point_2 = frame_vertices[reference_joints[1]]
+    arr = np.array([frame_vertices[5], frame_vertices[13], frame_vertices[17]])
+    point_2 = arr.sum(axis=0)
+
     a = point_2[1] - point_1[1]
     b = point_2[2] - point_1[2]
     c = math.sqrt(a ** 2 + b ** 2)
@@ -33,7 +37,10 @@ def stop_rotation_around_x(frame_vertices, reference_joints):
 
 def stop_rotation_around_y(frame_vertices, reference_joints):
     point_1 = frame_vertices[reference_joints[0]]
-    point_2 = frame_vertices[reference_joints[1]]
+    # point_2 = frame_vertices[reference_joints[1]]
+
+    arr = np.array([frame_vertices[5], frame_vertices[13], frame_vertices[17]])
+    point_2 = arr.sum(axis=0)
 
     a = point_2[0] - point_1[0]
     b = point_2[2] - point_1[2]
@@ -91,7 +98,7 @@ def scale_vertices2(frame_vertices, scale_factor=1):
     base_limb_length = distance.euclidean(wrist_joint, index_base_joint)
 
     base_limb_length2 = distance.euclidean(frame_vertices[17], frame_vertices[5])
-    scale_factor2 = 0.7/base_limb_length2
+    scale_factor2 = 0.7 / base_limb_length2
     unit_vec2 = _unit_vector([frame_vertices[17][i] - frame_vertices[5][i] for i in range(0, 3)])
 
     scale_factor = scale_factor / base_limb_length
@@ -101,9 +108,9 @@ def scale_vertices2(frame_vertices, scale_factor=1):
 
     processed = []
     for land_mark in frame_vertices:
-        processed.append([land_mark[0] * scale_factor2*unit_vec2[0],
-                          land_mark[1] * scale_factor*unit_vector[1],
-                          land_mark[2] * (scale_factor+scale_factor2)/2])
+        processed.append([land_mark[0] * scale_factor2 * unit_vec2[0],
+                          land_mark[1] * scale_factor * unit_vector[1],
+                          land_mark[2] * (scale_factor + scale_factor2) / 2])
     return processed
 
 

@@ -7,7 +7,7 @@ from scipy.spatial import distance
 from sklearn import tree
 
 from feature_extraction.pre_processor import un_flatten_points, get_angle_v2, normalize_flat_coordinates_scale
-from utils.constants import LABEL_VS_INDEX, JOINTS_FOR_ANGLES
+from utils.constants import LABEL_VS_INDEX, EDGE_PAIRS_FOR_ANGLES
 
 
 class NearestNeighborPoseClassifier:
@@ -22,17 +22,18 @@ class NearestNeighborPoseClassifier:
         pass
 
     def classify(self, landmark):
+        if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
         incoming_frame = self.unify_frame_features(landmark)
         # logging.info(incoming_frame)
         self.cluster_means['distance'] = self.cluster_means.drop(['sign', 'distance'], errors='ignore', axis=1) \
             .apply(lambda x: distance.euclidean(x, incoming_frame), axis=1)
-        candidates_df = self.cluster_means.nsmallest(5, 'distance').sort_values(by=['distance'])[self.cluster_means.distance<5]
+        candidates_df = self.cluster_means.nsmallest(5, 'distance').sort_values(by=['distance'])
         candidates_df['class'] = candidates_df['sign'].apply(lambda x: LABEL_VS_INDEX.get(x))
 
-        joint_wise_deviation = (candidates_df.drop(['sign', 'distance', 'class'], axis=1) - incoming_frame).abs()
-        max_deviations = joint_wise_deviation.apply('max', axis=1)
-        alternative = candidates_df.loc[max_deviations.idxmin()]['class']
-        logging.info('Alternative: {}'.format(alternative))
+        # joint_wise_deviation = (candidates_df.drop(['sign', 'distance', 'class'], axis=1) - incoming_frame).abs()
+        # max_deviations = joint_wise_deviation.apply('max', axis=1)
+        # alternative = candidates_df.loc[max_deviations.idxmin()]['class']
+        # logging.info('Alternative: {}'.format(alternative))
         #
         # lowest = max_deviations.iloc[0]
         # for deviation in max_deviations:
@@ -91,15 +92,15 @@ class ClassifierByAngles(NearestNeighborPoseClassifier):
     def unify_cluster_mean_features(self, cluster_means):
         signs = cluster_means['sign']
         means_list = cluster_means.drop('sign', axis=1).values.tolist()
-        mean_angles_df_cols = [str(point_pair) for point_pair in JOINTS_FOR_ANGLES]
+        mean_angles_df_cols = [str(point_pair) for point_pair in EDGE_PAIRS_FOR_ANGLES]
         mean_angles_df = pd.DataFrame(columns=mean_angles_df_cols)
 
         for row in means_list:
             angles_for_the_row = []
             row = un_flatten_points(row)
-            for joint in JOINTS_FOR_ANGLES:
-                limb2 = [row[joint[2]][i] - row[joint[1]][i] for i in range(0, 3)]
-                limb1 = [row[joint[1]][i] - row[joint[0]][i] for i in range(0, 3)]
+            for limb_pair in EDGE_PAIRS_FOR_ANGLES:
+                limb2 = [row[limb_pair[1][1]][i] - row[limb_pair[1][0]][i] for i in range(0, 3)]
+                limb1 = [row[limb_pair[0][1]][i] - row[limb_pair[0][0]][i] for i in range(0, 3)]
                 reference_angle = get_angle_v2(limb2, limb1)
                 angles_for_the_row.append((reference_angle-90) / 90)
             row_angles_df = pd.DataFrame([angles_for_the_row], columns=mean_angles_df_cols)
@@ -109,9 +110,9 @@ class ClassifierByAngles(NearestNeighborPoseClassifier):
 
     def unify_frame_features(self, landmark):
         angles = []
-        for joint in JOINTS_FOR_ANGLES:
-            limb2 = [landmark[joint[2]][i] - landmark[joint[1]][i] for i in range(0, 3)]
-            limb1 = [landmark[joint[1]][i] - landmark[joint[0]][i] for i in range(0, 3)]
+        for limb_pair in EDGE_PAIRS_FOR_ANGLES:
+            limb2 = [landmark[limb_pair[1][1]][i] - landmark[limb_pair[1][0]][i] for i in range(0, 3)]
+            limb1 = [landmark[limb_pair[0][1]][i] - landmark[limb_pair[0][0]][i] for i in range(0, 3)]
             angle = get_angle_v2(limb2, limb1)
             angles.append((angle-90) / 90)
 
@@ -147,6 +148,7 @@ class DecisionTreeClassifier(ClassifierByAnglesAndCoordinates):
 
 
     def classify(self, landmark):
+        if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
         incoming_frame = self.unify_frame_features(landmark)
         self.clf.predict([incoming_frame])
 

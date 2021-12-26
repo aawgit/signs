@@ -2,6 +2,7 @@ import csv
 import logging
 import multiprocessing
 import threading
+import os
 
 import numpy as np
 import pandas as pd
@@ -15,6 +16,7 @@ from feature_extraction.renderer import render, render_static, render_static_2_h
 from pose_estimation.interfacer import mp_estimate_pose, mp_estimate_pose_static
 from utils.constants import ClassificationMethods
 from utils.video_utils import get_static_frame, show_frame, video_meta
+from classify_entry import _get_training_data, classifier_worker
 
 logging.basicConfig(level=logging.INFO)
 
@@ -64,57 +66,92 @@ def add_labels_to_landmarks(land_marks_vs_frame, label_vs_second_file, frame_rat
     return merged
 
 
-def video_position_selector(video_file, process_callback, queue):
-    logging.info('Starting video position selector...')
-    cap = cv2.VideoCapture(video_file)
-    length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+class LabellerWindow:
+    def __init__(self, video, callback, hand_pose_q, file_name=None):
+        self.video = video
+        self.callback = callback
+        self.queue = hand_pose_q
+        self.current_landmark = []
+        self.file_name=file_name
 
-    cv2.namedWindow("Video feed", cv2.WINDOW_NORMAL)
+    def update_current_landmark(self, land_marks):
+        self.current_landmark = land_marks
 
-    def onChange(trackbarValue):
-        cap.set(cv2.CAP_PROP_POS_FRAMES, trackbarValue)
-        err, img = cap.read()
-        cv2.imshow("Video feed", img)
-        process_callback(img, trackbarValue, queue)
+    def save_current_landmark(self, *args):
+        print('Saving current landmark {}'.format(self.current_landmark))
+        if not self.file_name: self.file_name = os.path.basename(self.video)
+        path = "./data/training/{}.csv".format(self.file_name.split(".")[0])
+        row = []
+        lm = pre_process_single_frame(self.current_landmark)
+        for landmark_point in lm:
+            row.extend(np.round(landmark_point, 4))
+        with open(path, 'a') as fd:
+            writer = csv.writer(fd)
+            writer.writerow(['<SET>', *row])
+
+    def process_callback_wrapper(self):
         pass
 
-    cv2.createTrackbar('start', 'Video feed', 0, length, onChange)
-    cv2.createTrackbar('end', 'Video feed', 100, length, onChange)
-
-    onChange(0)
-    cv2.waitKey()
-
-    start = cv2.getTrackbarPos('start', 'mywindow')
-    end = cv2.getTrackbarPos('end', 'mywindow')
-    if start >= end:
-        raise Exception("start must be less than end")
-
-    cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-    while cap.isOpened():
-        err, img = cap.read()
-        if cap.get(cv2.CAP_PROP_POS_FRAMES) >= end:
-            break
+    def on_change_wrapper(self, trackbarValue):
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, trackbarValue)
+        err, img = self.cap.read()
         cv2.imshow("Video feed", img)
-        k = cv2.waitKey(10) & 0xff
-        if k == 27:
-            break
+        land_marks = self.callback(img, trackbarValue, self.queue)
+        self.update_current_landmark(land_marks)
+
+    def video_position_selector(self):
+        logging.info('Starting video position selector...')
+        cap = cv2.VideoCapture(self.video)
+        self.cap = cap
+        length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        cv2.namedWindow("Video feed", cv2.WINDOW_NORMAL)
+        cv2.createButton("Save", self.save_current_landmark, None, cv2.QT_PUSH_BUTTON)
 
 
-def image_and_estimation(video, callback):
+        cv2.createTrackbar('start', 'Video feed', 0, length, self.on_change_wrapper)
+        cv2.createTrackbar('end', 'Video feed', 100, length, self.on_change_wrapper)
+
+        self.on_change_wrapper(0)
+        cv2.waitKey()
+
+        start = cv2.getTrackbarPos('start', 'mywindow')
+        end = cv2.getTrackbarPos('end', 'mywindow')
+        if start >= end:
+            raise Exception("start must be less than end")
+
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
+        while cap.isOpened():
+            err, img = cap.read()
+            if cap.get(cv2.CAP_PROP_POS_FRAMES) >= end:
+                break
+            cv2.imshow("Video feed", img)
+            k = cv2.waitKey(10) & 0xff
+            if k == 27:
+                break
+
+
+def image_and_estimation(video, callback, fname=None):
     pool = multiprocessing.Pool(processes=2)
     m = multiprocessing.Manager()
 
     hand_pose_q = m.Queue()
     pre_processed_q_1 = m.Queue()
     pre_processed_q_2 = m.Queue()
+    pre_processed_q_3 = m.Queue()
 
-    pool.apply_async(run_pre_process_steps, (hand_pose_q, pre_processed_q_1, [pre_processed_q_2]))
+    pool.apply_async(run_pre_process_steps, (hand_pose_q, pre_processed_q_1, [pre_processed_q_2, pre_processed_q_3]))
 
-    pool.apply_async(render, (pre_processed_q_1,))
+    # pool.apply_async(render, (pre_processed_q_1,))
 
-    threading.Thread(target=display_coordinates, args=(pre_processed_q_2, ), daemon=True).start()
+    threading.Thread(target=display_coordinates, args=(pre_processed_q_2,), daemon=True).start()
 
-    video_position_selector(video, callback, hand_pose_q)
+    training_data = _get_training_data()
+    pool.apply_async(classifier_worker, (pre_processed_q_3, training_data, ClassificationMethods.ANGLES))
+
+    lw = LabellerWindow(video, callback, hand_pose_q, fname)
+    lw.video_position_selector()
+
 
 def display_coordinates(queue):
     while True:
@@ -125,17 +162,19 @@ def display_coordinates(queue):
         except Exception as e:
             break
 
+
 def callback(img, frame_no, queue):
     logging.info(frame_no)
     if img is None: return
     land_marks = mp_estimate_pose_static(img)
     if land_marks and len(land_marks) > 0:
         queue.put((land_marks, frame_no))
+        return land_marks
 
 
 if __name__ == '__main__':
-    video_m = video_meta.get(2)
+    video_m = video_meta.get(1)
     video = video_m.get('location')
     fps = video_m.get('fps')
 
-    image_and_estimation(video, callback)
+    image_and_estimation(video, callback, "reference-signs-aw-01-right.csv")
