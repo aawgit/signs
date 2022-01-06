@@ -46,12 +46,12 @@ video_meta = {
             fps=20),
     4: dict(location="./data/video/Samantha.mp4",
             fps=30),
-    5: dict(location="./data/video/ahanna_youtube/th.mp4",
+    7: dict(location="./data/video/ahanna_youtube/th.mp4",
             fps=25),
     6: dict(location="/home/aka/Downloads/ego hands dataset/videos_1/Subject04/Scene2/Color/rgb2.avi",
             fps=30),
-    7: dict(location="./data/video/buddika/e-N.mp4",
-            fps=29.59),
+    5: dict(location="./data/video/buddika/all.mkv",
+            fps=29.61),
     8: dict(location="./data/video/ref/right/f.mp4", fps=30)
 }
 

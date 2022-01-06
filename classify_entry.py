@@ -8,7 +8,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from classification.classifier import ClassifierByFlatCoordinates, ClassifierByAngles, \
-    ClassifierByAnglesAndCoordinates, DecisionTreeClassifier
+    ClassifierByAnglesAndCoordinates, ExperimentalClassifier
 from feature_extraction.pre_processor import run_pre_process_steps, pre_process_single_frame, un_flatten_points
 from feature_extraction.renderer import render, render_static, render_static_2_hands, render_static_and_dynamic
 from pose_estimation.interfacer import mp_estimate_pose, mp_estimate_pose_static
@@ -16,6 +16,7 @@ from utils.constants import ClassificationMethods, LABEL_VS_INDEX
 from utils.video_utils import get_static_frame, show_frame, video_meta
 
 logging.basicConfig(level=logging.INFO)
+
 
 def process_video(video=None, classify=False, method=ClassificationMethods.FLAT_COORDINATES):
     no_of_processes = 3 if classify else 2
@@ -105,11 +106,15 @@ def classify_static(land_marks, means, method=ClassificationMethods.FLAT_COORDIN
     logging.info(out_put)
     return out_put
 
+
 def validate():
     all_results = pd.DataFrame()
-    for file_id in range(1, 5):
+    means = _get_training_data()
+    classifier = ExperimentalClassifier(means, None)
+    for file_id in range(1, 2):
         file_path = './data/labels/{}.csv'.format(file_id)
         labels: pd.DataFrame = pd.read_csv(file_path)
+        labels = labels[labels['label']!=22]
         results_for_file = pd.DataFrame()
         for index, row in labels.iterrows():
             video_m = video_meta.get(file_id)
@@ -124,16 +129,15 @@ def validate():
 
             total_frames = end_frame - start_frame
 
-            for frame in [start_frame+total_frames*.1*i for i in range(1, 10)]:
+            for frame in [start_frame + total_frames * .1 * i for i in range(1, 10)]:
                 if row['label'] == 50 or row['label'] == 51: continue
                 logging.info('Processing a single frame...')
-                image = get_static_frame(video, frame/fps, fps=fps)
+                image = get_static_frame(video, frame / fps, fps=fps)
                 land_marks = mp_estimate_pose_static(image)
                 land_marks = pre_process_single_frame(land_marks)
 
-
-                means = _get_training_data()
-                prediction = classify_static(land_marks, means, method=ClassificationMethods.ANGLES)
+                # prediction = classify_static(land_marks, means, method=ClassificationMethods.ANGLES)
+                prediction = classifier.classify(land_marks)
                 if prediction[0].get('class') == 'NA': continue
                 prediction[0].update({'truth_sign': LABEL_VS_INDEX.get(row['label'])})
                 result_row = pd.DataFrame(prediction[0], index=[0])
@@ -150,6 +154,7 @@ def validate():
     logging.info('Results for all \nacc {} \npre {}'.format(acc, pre))
     _plot_cnf_matrix(all_results)
 
+
 def _plot_cnf_matrix(all_results):
     cf_matrix = confusion_matrix(all_results['truth_sign'], all_results['class'],
                                  labels=all_results['truth_sign'].unique())
@@ -165,15 +170,13 @@ def _plot_cnf_matrix(all_results):
     plt.show()
 
 
-
-
 if __name__ == '__main__':
     logging.info('Initiating classification...')
-    video_m = video_meta.get(4)
+    video_m = video_meta.get(7)
     video = video_m.get('location')
     fps = video_m.get('fps')
 
-    time = 6*60 + 56
+    time = 31.2
 
     # process_single_frame(video, time, fps, classify=True, method=ClassificationMethods.ANGLES)
 

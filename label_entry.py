@@ -142,7 +142,7 @@ def image_and_estimation(video, callback, fname=None):
 
     pool.apply_async(run_pre_process_steps, (hand_pose_q, pre_processed_q_1, [pre_processed_q_2, pre_processed_q_3]))
 
-    # pool.apply_async(render, (pre_processed_q_1,))
+    pool.apply_async(render, (pre_processed_q_1,))
 
     threading.Thread(target=display_coordinates, args=(pre_processed_q_2,), daemon=True).start()
 
@@ -173,8 +173,8 @@ def callback(img, frame_no, queue):
 
 
 if __name__ == '__main__':
-    video_m = video_meta.get(1)
+    video_m = video_meta.get(5)
     video = video_m.get('location')
     fps = video_m.get('fps')
 
-    image_and_estimation(video, callback, "reference-signs-aw-01-right.csv")
+    image_and_estimation(video, callback, "reference-signs-aw-01-right-.csv")

@@ -12,30 +12,30 @@ from utils.video_utils import video_meta
 
 
 def get_saved_land_mark(sign, sign_file_df):
-    coordinates = list(sign_file_df[sign_file_df['sign'] == sign].iloc[5])[1:]
+    coordinates = list(sign_file_df[sign_file_df['sign'] == sign].iloc[1])[1:]
     land_mark = [tuple(coordinates[i:i + 3]) for i in range(0, len(coordinates), 3)]
     return land_mark
 
 if __name__ == '__main__':
     means = _get_training_data()
 
-    video_m = video_meta.get(3)
+    video_m = video_meta.get(1)
     video = video_m.get('location')
     fps = video_m.get('fps')
 
-    time = 454.5
+    time = 64 # testing th, estimations seem flat
 
-    saved_lm = get_saved_land_mark(1, means)
-    saved_lm = pre_process_single_frame(saved_lm)
-    render_static(saved_lm)
+    # saved_lm = get_saved_land_mark(19, means)
+    # saved_lm = pre_process_single_frame(saved_lm)
+    # render_static(saved_lm)
     #
     # saved_lm2 = get_saved_land_mark(16, means2)
     # saved_lm = pre_process_single_frame(saved_lm)
 
-    # image = get_static_frame(video, time, fps=fps)
-    # # image = cv2.imread('./data/video/ref/left/51_3.jpg')
-    # land_marks = mp_estimate_pose_static(image)
-    # land_marks = pre_process_single_frame(land_marks)
+    image = get_static_frame(video, time, fps=fps)
+    # image = cv2.imread('./data/video/ref/left/51_3.jpg')
+    land_marks = mp_estimate_pose_static(image)
+    land_marks = pre_process_single_frame(land_marks)
     # #
     # flatted = flatten_points(land_marks)
     # rounded = [np.round(p, 4) for p in flatted]
@@ -50,6 +50,6 @@ if __name__ == '__main__':
     # land_marks2 = mp_estimate_pose_static(image2)
     # land_marks2 = pre_process_single_frame(land_marks2)
 
-    # render_static(land_marks)
+    render_static(land_marks)
 
     # render_static_2_hands(land_marks, saved_lm)

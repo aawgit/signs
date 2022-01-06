@@ -1,6 +1,13 @@
 import logging
 from itertools import chain
 
+from sklearn.linear_model import LogisticRegression
+from scipy.stats import mode
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.neighbors import KNeighborsClassifier
+
 import pandas as pd
 import pygame
 from scipy.spatial import distance
@@ -180,4 +187,48 @@ class KeyInputHolder:
 
         windowSurface.fill(BLACK)
 
+
+class ExperimentalClassifier(ClassifierByAnglesAndCoordinates):
+    def __init__(self, cluster_means: pd.DataFrame, threshold):
+        super().__init__(cluster_means, threshold)
+        self.clf0 = LogisticRegression(random_state=0).fit(self.cluster_means.drop('sign', axis=1), self.cluster_means['sign']) # - Good
+        self.clf1 = KNeighborsClassifier(n_neighbors=3, metric='minkowski', p=4, weights='distance') # - Good
+            #euc: 0.5689, 0.5027
+            #manhattan: 0.5377, 0.4836
+            #chebyshev: 0.5114, 0.4996
+            #minkowski: 0.5689, 0.5027; p=3 0.5340, 0.4710; p=4 0.5737, 0.4908, p=4 weights=distance 0.5832, 0.5507
+            #wminkowski:
+            #seuclidean:
+            #mahalanobis:
+        self.clf2 = RandomForestClassifier(n_estimators=100, random_state=0, criterion='gini')
+        self.clf3 = RandomForestClassifier(n_estimators=100, random_state=0, criterion='entropy')
+        # - Good - 0.58 acc; random state not set
+        # gini 0.5605, 0.54747 rs 0;
+        # entropy 0.5473, 0.5303
+        self.clf4 = GradientBoostingClassifier(n_estimators=100, learning_rate=1.0,
+            max_depth=1, random_state=0)
+        self.clf1.fit(self.cluster_means.drop('sign', axis=1), self.cluster_means['sign'])
+        self.clf2.fit(self.cluster_means.drop('sign', axis=1), self.cluster_means['sign'])
+        self.clf3.fit(self.cluster_means.drop('sign', axis=1), self.cluster_means['sign'])
+        self.clf4.fit(self.cluster_means.drop('sign', axis=1), self.cluster_means['sign'])
+        pass
+
+    def classify(self, landmark):
+        if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
+        incoming_frame = self.unify_frame_features(landmark)
+        # logging.info(incoming_frame)
+        p0 = self.clf0.predict([incoming_frame, ])
+        p1 = self.clf1.predict([incoming_frame, ])
+        p2 = self.clf2.predict([incoming_frame, ])
+        # p4 = self.clf4.predict([incoming_frame, ])
+        p = mode([p0[0], p1[0], p2[0]])
+        if p:
+            p=p[0]
+            prediction = [{'class': LABEL_VS_INDEX.get(p[0])}]
+            return prediction
+        else: return [{'class': 'NA', 'distance': 'NA'}]
+        # if p4:
+        #     prediction = [{'class': LABEL_VS_INDEX.get(p4[0])}]
+        #     return prediction
+        # else: return [{'class': 'NA', 'distance': 'NA'}]
 
