@@ -2,6 +2,7 @@ import logging
 from pose_estimation.media_pipe_dynamic_estimator import dynamic_images
 from pose_estimation.pose_estimator_by_frame import static_images
 from pose_estimation.adjuster import adjust_finger_bases
+from pose_estimation.media_pipe_static_estimator import static_images_2
 
 
 def mp_callback(queue, results, frame_no):
@@ -56,3 +57,7 @@ def mp_callback_static(results):
 def mp_estimate_pose_static(image):
     logging.info('Initiating pose estimation...')
     return static_images(image, mp_callback_static)
+
+def mp_estimate_pose_from_image(path):
+    result = static_images_2(path)
+    return mp_callback_static(result)

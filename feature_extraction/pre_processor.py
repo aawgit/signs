@@ -32,7 +32,7 @@ def stop_rotation_around_x(frame_vertices, reference_joints):
         rotated = np.matmul(rotation_matrix_x, point)
         # rotated = np.matmul(rotation_matrix_x_2, rotated)
         rotated_vertices.append((rotated[0], rotated[1], rotated[2]))
-    return rotated_vertices
+    return rotated_vertices, np.arcsin(sin)
 
 
 def stop_rotation_around_y(frame_vertices, reference_joints):
@@ -61,7 +61,7 @@ def stop_rotation_around_y(frame_vertices, reference_joints):
         rotated = np.matmul(rotation_matrix_y, point)
         # rotated = np.matmul(rotation_matrix_y_2, rotated)
         rotated_vertices.append((rotated[0], rotated[1], rotated[2]))
-    return rotated_vertices
+    return rotated_vertices, np.arcsin(sin)
 
 
 def stop_rotation_around_z(frame_vertices, reference_joints):
@@ -89,7 +89,7 @@ def stop_rotation_around_z(frame_vertices, reference_joints):
         rotated = np.matmul(rotation_matrix_z, point)
         rotated = np.matmul(rotation_matrix_z_2, rotated)
         rotated_vertices.append((rotated[0], rotated[1], rotated[2]))
-    return rotated_vertices
+    return rotated_vertices, np.arcsin(sin)
 
 
 def scale_vertices2(frame_vertices, scale_factor=1):
@@ -111,7 +111,7 @@ def scale_vertices2(frame_vertices, scale_factor=1):
         processed.append([land_mark[0] * scale_factor2 * unit_vec2[0],
                           land_mark[1] * scale_factor * unit_vector[1],
                           land_mark[2] * (scale_factor + scale_factor2) / 2])
-    return processed
+    return processed, None
 
 
 def scale_vertices(frame_vertices, scale_factor=1):
@@ -131,14 +131,16 @@ def normalize_movement(frame_vertices):
     for frame_vertex in frame_vertices:
         relocated_vertices.append((frame_vertex[0] - origin_coordinates[0], frame_vertex[1] - origin_coordinates[1],
                                    frame_vertex[2] - origin_coordinates[2]))
-    return relocated_vertices
+    return relocated_vertices, None
 
 
 def pre_process(land_marks, steps, args_for_steps):
     processed = land_marks
+    rotations = []
     for idx, step in enumerate(steps):
-        processed = step(processed, *args_for_steps[idx])
-    return tuple(processed)
+        processed, rotation = step(processed, *args_for_steps[idx])
+        if rotation: rotations.append(rotation)
+    return tuple(processed), rotations
 
 
 def get_angle_v2(v1, v2):
@@ -254,13 +256,13 @@ def pre_process_single_frame(land_mark):
         (),
         # ()
     ]
-    current_vertices = pre_process(land_mark, steps, args_for_steps)
+    current_vertices, angles = pre_process(land_mark, steps, args_for_steps)
     # coordinates = []
     # for current_vertex in current_vertices:
     #     for coordinate in current_vertex:
     #         coordinates.append(np.round(coordinate, 8))
     # logging.info(coordinates)
-    return current_vertices
+    return current_vertices, angles
 
 
 def run_pre_process_steps(pose_q, processed_q_1, duplicate_queues=None, for_labelling=False):

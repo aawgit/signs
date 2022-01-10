@@ -8,7 +8,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from classification.classifier import ClassifierByFlatCoordinates, ClassifierByAngles, \
-    ClassifierByAnglesAndCoordinates, ExperimentalClassifier
+    ClassifierByAnglesAndCoordinates, ExperimentalClassifier, FingerwiseCompareClassifier, EnsembleClassifier
 from feature_extraction.pre_processor import run_pre_process_steps, pre_process_single_frame, un_flatten_points
 from feature_extraction.renderer import render, render_static, render_static_2_hands, render_static_and_dynamic
 from pose_estimation.interfacer import mp_estimate_pose, mp_estimate_pose_static
@@ -18,7 +18,7 @@ from utils.video_utils import get_static_frame, show_frame, video_meta
 logging.basicConfig(level=logging.INFO)
 
 
-def process_video(video=None, classify=False, method=ClassificationMethods.FLAT_COORDINATES):
+def process_video(video=None, classify=False, method=ClassificationMethods.ENSEMBLE_1):
     no_of_processes = 3 if classify else 2
     pool = multiprocessing.Pool(processes=no_of_processes)
     m = multiprocessing.Manager()
@@ -58,13 +58,24 @@ def process_single_frame(video_file, seconds, fps, classify=False, method=Classi
 
 def _get_training_data():
     # TODO: Rename
-    means_file = './data/training/reference-signs-aw-01-left.csv'
+    means_file = './data/training/reference-signs-aw-01-right.csv'
     means: pd.DataFrame = pd.read_csv(means_file)
 
-    means_file_2 = './data/training/reference-signs-aw-01-right.csv'
+    means_file_2 = './data/training/reference-signs-aw-01-left.csv'
     means2 = pd.read_csv(means_file_2)
-
     means = means.append(means2)
+
+    # means_file_3 = './data/training/reference-signs-geshani.csv'
+    # means3 = pd.read_csv(means_file_3)
+    # means = means.append(means3)
+
+    means_file_4 = './data/training/8.csv'
+    means4 = pd.read_csv(means_file_4)
+    means = means.append(means4)
+
+    means_file_5 = './data/training/9.csv'
+    means5 = pd.read_csv(means_file_5)
+    means = means.append(means5)
     return means
 
 
@@ -76,6 +87,8 @@ def classifier_worker(processed_q, means, method):
         classifier = ClassifierByAngles(means)
     if method == ClassificationMethods.ANGLES_AND_FLAT_CO:
         classifier = ClassifierByAnglesAndCoordinates(means, 2)
+    if method == ClassificationMethods.ENSEMBLE_1:
+        classifier = ExperimentalClassifier(means, 2)
     previous_sign = None
     while True:
         try:
@@ -111,10 +124,10 @@ def validate():
     all_results = pd.DataFrame()
     means = _get_training_data()
     classifier = ExperimentalClassifier(means, None)
-    for file_id in range(1, 2):
+    for file_id in [1, 2, 3, 4]:
         file_path = './data/labels/{}.csv'.format(file_id)
         labels: pd.DataFrame = pd.read_csv(file_path)
-        labels = labels[labels['label']!=22]
+        # labels = labels[labels['label'] == 26]
         results_for_file = pd.DataFrame()
         for index, row in labels.iterrows():
             video_m = video_meta.get(file_id)
@@ -134,15 +147,16 @@ def validate():
                 logging.info('Processing a single frame...')
                 image = get_static_frame(video, frame / fps, fps=fps)
                 land_marks = mp_estimate_pose_static(image)
-                land_marks = pre_process_single_frame(land_marks)
+                land_marks, angles = pre_process_single_frame(land_marks)
 
                 # prediction = classify_static(land_marks, means, method=ClassificationMethods.ANGLES)
                 prediction = classifier.classify(land_marks)
-                if prediction[0].get('class') == 'NA': continue
+                if prediction[0].get('class') == 'NA':
+                    continue
                 prediction[0].update({'truth_sign': LABEL_VS_INDEX.get(row['label'])})
                 result_row = pd.DataFrame(prediction[0], index=[0])
                 results_for_file = results_for_file.append(result_row)
-
+        if results_for_file.empty: continue
         all_results = all_results.append(results_for_file)
 
         acc = accuracy_score(results_for_file['truth_sign'], results_for_file['class'])
@@ -180,7 +194,7 @@ if __name__ == '__main__':
 
     # process_single_frame(video, time, fps, classify=True, method=ClassificationMethods.ANGLES)
 
-    # process_video(video=None, classify=True, method=ClassificationMethods.ANGLES)
+    # process_video(video=None, classify=True, method=ClassificationMethods.ENSEMBLE_1)
     # process_video()
     # means = _get_training_data()
     # classifier = DecisionTreeClassifier(means, 2)
