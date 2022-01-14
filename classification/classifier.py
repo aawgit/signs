@@ -81,7 +81,14 @@ class ClassifierByFlatCoordinates(NearestNeighborPoseClassifier):
             unified_cluster_means = cluster_means.drop(cols_to_drop, errors='ignore', axis=1)
         else:
             unified_cluster_means = cluster_means
+        # unified_cluster_means = self._drop_z_axis(unified_cluster_means)
         return unified_cluster_means.reset_index(drop=True)
+
+    def _drop_z_axis(self, cluster_means):
+        cols_to_drop = [col for col in cluster_means.columns.values if col.endswith('2')]
+
+        remaining_cluster_means = cluster_means.drop(cols_to_drop, errors='ignore', axis=1)
+        return remaining_cluster_means
 
     def unify_frame_features(self, landmark):
         landmark = list(landmark)
@@ -89,8 +96,13 @@ class ClassifierByFlatCoordinates(NearestNeighborPoseClassifier):
             for idx, vertex in enumerate(self.vertices_to_ignore):
                 del landmark[vertex - idx]
         flattened_coordinates = list(chain(*landmark))
+        # flattened_coordinates = self.remve_z_coordinate(flattened_coordinates)
         return flattened_coordinates
 
+    def remve_z_coordinate(self, flattened_coordinates):
+        k = 3
+        del flattened_coordinates[k-1::k]
+        return flattened_coordinates
 
 class ClassifierByAngles(NearestNeighborPoseClassifier):
     def __init__(self, cluster_means: pd.DataFrame, vertices_to_ignore=None):
@@ -240,7 +252,7 @@ class ExperimentalClassifier(ClassifierByAnglesAndCoordinates):
         #         prediction = [{'class': LABEL_VS_INDEX.get(p[0])}]
         #     else:
         #         prob = self.clf1.predict_proba([incoming_frame, ])
-        prediction = [{'class': LABEL_VS_INDEX.get(p)}]
+        prediction = [{'class': LABEL_VS_INDEX.get(p), 'index': p}]
         return prediction
         # else:
         #     return [{'class': 'NA', 'distance': 'NA'}]
@@ -264,7 +276,7 @@ class ExperimentalClassifier(ClassifierByAnglesAndCoordinates):
             pred_knn[0]
         ]).mode[0]
 
-        prediction = [{'class': LABEL_VS_INDEX.get(p)}]
+        prediction = [{'class': LABEL_VS_INDEX.get(p), 'index': p}]
         return prediction
 
 class EnsembleClassifier(NearestNeighborPoseClassifier):
@@ -310,9 +322,26 @@ class EnsembleClassifier(NearestNeighborPoseClassifier):
         pred_lr_a = self.lr_a.predict([incoming_frame_a, ])
         pred_rf1_a = self.rf1_a.predict([incoming_frame_a, ])
 
-        p = mode([pred_rf1_c[0], pred_lr_c[0], pred_knn_c[0], pred_rf1_a[0], pred_lr_a[0], pred_knn_a[0]]).mode[0]
+        p1 = mode([pred_rf1_c[0],
+            pred_lr_c[0],
+            pred_knn_c[0]]).mode[0]
 
-        prediction = [{'class': LABEL_VS_INDEX.get(p)}]
+        p2 = mode( [pred_rf1_a[0],
+            pred_lr_a[0],
+            pred_knn_a[0]]).mode[0]
+
+        p = mode([p2, p1]).mode[0]
+
+        # p = mode([
+        #     pred_rf1_c[0],
+        #     pred_lr_c[0],
+        #     pred_knn_c[0],
+        #     pred_rf1_a[0],
+        #     pred_lr_a[0],
+        #     pred_knn_a[0]
+        # ]).mode[0]
+
+        prediction = [{'class': LABEL_VS_INDEX.get(p), 'index': p}]
         return prediction
 
 important_feature_idx = [0, 3, 5, 6, 7, 8, 9, 10, 11, 13, 16, 19, 20, 22, 25, 28, 31, 34, 35, 37, 38, 40, 43,
@@ -381,3 +410,19 @@ def classify_finger_wise(references, incoming_frame):
     sign = LABEL_VS_INDEX.get(selected_references['sign'].iloc[0])
     logging.info('Sign is')
     return [{'class': sign}]
+
+def rule_based_classify(pred, angles):
+    pred_sign = pred.get('index')
+    # 'U උ' and 'L ල්'
+    if pred_sign == 7 or pred_sign == 27:
+        z_rotation = angles[1]
+        if z_rotation> 75: sign = 27
+        else: sign = 7
+        return  [{'class': LABEL_VS_INDEX.get(sign), 'index': sign}]
+    # 'Dh ද්' and 'P ප්'
+    elif pred_sign == 17 or pred_sign == 22:
+        z_rotation = angles[1]
+        if z_rotation> 75: sign = 17
+        else: sign = 22
+        return  [{'class': LABEL_VS_INDEX.get(sign), 'index': sign}]
+    else: return [pred]

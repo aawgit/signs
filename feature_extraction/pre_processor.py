@@ -139,7 +139,7 @@ def pre_process(land_marks, steps, args_for_steps):
     rotations = []
     for idx, step in enumerate(steps):
         processed, rotation = step(processed, *args_for_steps[idx])
-        if rotation: rotations.append(rotation)
+        if rotation: rotations.append(math.degrees(rotation))
     return tuple(processed), rotations
 
 

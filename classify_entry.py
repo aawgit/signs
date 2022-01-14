@@ -8,7 +8,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from classification.classifier import ClassifierByFlatCoordinates, ClassifierByAngles, \
-    ClassifierByAnglesAndCoordinates, ExperimentalClassifier, FingerwiseCompareClassifier, EnsembleClassifier
+    ClassifierByAnglesAndCoordinates, ExperimentalClassifier, FingerwiseCompareClassifier, EnsembleClassifier,\
+    rule_based_classify
 from feature_extraction.pre_processor import run_pre_process_steps, pre_process_single_frame, un_flatten_points
 from feature_extraction.renderer import render, render_static, render_static_2_hands, render_static_and_dynamic
 from pose_estimation.interfacer import mp_estimate_pose, mp_estimate_pose_static
@@ -123,11 +124,12 @@ def classify_static(land_marks, means, method=ClassificationMethods.FLAT_COORDIN
 def validate():
     all_results = pd.DataFrame()
     means = _get_training_data()
+    # classifier = EnsembleClassifier(means, None)
     classifier = ExperimentalClassifier(means, None)
     for file_id in [1, 2, 3, 4]:
         file_path = './data/labels/{}.csv'.format(file_id)
         labels: pd.DataFrame = pd.read_csv(file_path)
-        # labels = labels[labels['label'] == 26]
+        # labels = labels[labels['label'] == 17]
         results_for_file = pd.DataFrame()
         for index, row in labels.iterrows():
             video_m = video_meta.get(file_id)
@@ -147,12 +149,14 @@ def validate():
                 logging.info('Processing a single frame...')
                 image = get_static_frame(video, frame / fps, fps=fps)
                 land_marks = mp_estimate_pose_static(image)
+                if not land_marks: continue
                 land_marks, angles = pre_process_single_frame(land_marks)
-
+                # print(angles)
                 # prediction = classify_static(land_marks, means, method=ClassificationMethods.ANGLES)
                 prediction = classifier.classify(land_marks)
                 if prediction[0].get('class') == 'NA':
                     continue
+                prediction = rule_based_classify(prediction[0], angles)
                 prediction[0].update({'truth_sign': LABEL_VS_INDEX.get(row['label'])})
                 result_row = pd.DataFrame(prediction[0], index=[0])
                 results_for_file = results_for_file.append(result_row)

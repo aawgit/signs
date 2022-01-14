@@ -31,18 +31,18 @@ if __name__ == '__main__':
     video = video_m.get('location')
     fps = video_m.get('fps')
 
-    time = 86  # testing th, estimations seem flat
+    time = 58  # testing th, estimations seem flat
 
-    saved_lm = get_saved_land_mark(27, means)
-    saved_lm = pre_process_single_frame(saved_lm)
-    render_static(saved_lm)
+    # saved_lm = get_saved_land_mark(27, means)
+    # saved_lm = pre_process_single_frame(saved_lm)
+    # render_static(saved_lm)
     #
     # saved_lm2 = get_saved_land_mark(16, means2)
 
     image = get_static_frame(video, time, fps=fps)
     # image = cv2.imread('./data/video/ref/left/51_3.jpg')
     land_marks = mp_estimate_pose_static(image)
-    land_marks = pre_process_single_frame(land_marks)
+    land_marks, angles = pre_process_single_frame(land_marks)
     # #
     # flatted = flatten_points(land_marks)
     # rounded = [np.round(p, 4) for p in flatted]
@@ -57,6 +57,6 @@ if __name__ == '__main__':
     # land_marks2 = mp_estimate_pose_static(image2)
     # land_marks2 = pre_process_single_frame(land_marks2)
 
-    # render_static(land_marks)
+    render_static(land_marks)
 
     # render_static_2_hands(land_marks, saved_lm)
