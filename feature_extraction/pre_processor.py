@@ -92,25 +92,23 @@ def stop_rotation_around_z(frame_vertices, reference_joints):
     return rotated_vertices, np.arcsin(sin)
 
 
-def scale_vertices2(frame_vertices, scale_factor=1):
+def scale_vertices2(frame_vertices, scale_factor_v=1):
     wrist_joint = frame_vertices[0]
     index_base_joint = frame_vertices[9]
     base_limb_length = distance.euclidean(wrist_joint, index_base_joint)
+    scale_ratio_v = scale_factor_v / base_limb_length
+    base_vector_v = [index_base_joint[i] - wrist_joint[i] for i in range(0, 3)]
+    unit_vector_v = _unit_vector(base_vector_v)
 
     base_limb_length2 = distance.euclidean(frame_vertices[17], frame_vertices[5])
-    scale_factor2 = 0.7 / base_limb_length2
-    unit_vec2 = _unit_vector([frame_vertices[17][i] - frame_vertices[5][i] for i in range(0, 3)])
-
-    scale_factor = scale_factor / base_limb_length
-
-    base_vector = [index_base_joint[i] - wrist_joint[i] for i in range(0, 3)]
-    unit_vector = _unit_vector(base_vector)
+    scale_ratio_h = 0.7 / base_limb_length2
+    unit_vector_h = _unit_vector([frame_vertices[17][i] - frame_vertices[5][i] for i in range(0, 3)])
 
     processed = []
     for land_mark in frame_vertices:
-        processed.append([land_mark[0] * scale_factor2 * unit_vec2[0],
-                          land_mark[1] * scale_factor * unit_vector[1],
-                          land_mark[2] * (scale_factor + scale_factor2) / 2])
+        processed.append([land_mark[0] * scale_ratio_h * unit_vector_h[0],
+                          land_mark[1] * scale_ratio_v * unit_vector_v[1],
+                          land_mark[2] * (scale_ratio_v + scale_ratio_h) / 2])
     return processed, None
 
 

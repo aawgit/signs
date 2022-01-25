@@ -1,6 +1,5 @@
 venv/
 .idea/
 __pycache__/
-data/training/
 data/video/
 data/images/

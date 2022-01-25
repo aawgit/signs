@@ -322,15 +322,17 @@ class EnsembleClassifier(NearestNeighborPoseClassifier):
         pred_lr_a = self.lr_a.predict([incoming_frame_a, ])
         pred_rf1_a = self.rf1_a.predict([incoming_frame_a, ])
 
-        p1 = mode([pred_rf1_c[0],
-            pred_lr_c[0],
-            pred_knn_c[0]]).mode[0]
-
-        p2 = mode( [pred_rf1_a[0],
+        m1 = mode([pred_rf1_a[0],
             pred_lr_a[0],
-            pred_knn_a[0]]).mode[0]
+            pred_knn_a[0]])
+        if m1[1][0]>1:
+            p = m1[0][0]
+        else:
+            m2 = mode( [pred_rf1_c[0],
+                pred_lr_c[0],
+                pred_knn_c[0]])
 
-        p = mode([p2, p1]).mode[0]
+            p =m2[0][0]
 
         # p = mode([
         #     pred_rf1_c[0],
@@ -416,13 +418,13 @@ def rule_based_classify(pred, angles):
     # 'U උ' and 'L ල්'
     if pred_sign == 7 or pred_sign == 27:
         z_rotation = angles[1]
-        if z_rotation> 75: sign = 27
+        if z_rotation> 45: sign = 27
         else: sign = 7
         return  [{'class': LABEL_VS_INDEX.get(sign), 'index': sign}]
     # 'Dh ද්' and 'P ප්'
     elif pred_sign == 17 or pred_sign == 22:
         z_rotation = angles[1]
-        if z_rotation> 75: sign = 17
+        if z_rotation> 45: sign = 17
         else: sign = 22
         return  [{'class': LABEL_VS_INDEX.get(sign), 'index': sign}]
     else: return [pred]

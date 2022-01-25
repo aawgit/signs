@@ -1,8 +1,11 @@
 import logging
 import multiprocessing
 import threading
+import statistics
 
+import cv2
 import pandas as pd
+import numpy as np
 from sklearn.metrics import confusion_matrix, precision_score, accuracy_score
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -12,9 +15,9 @@ from classification.classifier import ClassifierByFlatCoordinates, ClassifierByA
     rule_based_classify
 from feature_extraction.pre_processor import run_pre_process_steps, pre_process_single_frame, un_flatten_points
 from feature_extraction.renderer import render, render_static, render_static_2_hands, render_static_and_dynamic
-from pose_estimation.interfacer import mp_estimate_pose, mp_estimate_pose_static
+from pose_estimation.interfacer import mp_estimate_pose, mp_estimate_pose_static, mp_estimate_pose_from_image
 from utils.constants import ClassificationMethods, LABEL_VS_INDEX
-from utils.video_utils import get_static_frame, show_frame, video_meta
+from utils.video_utils import get_static_frame, show_frame, video_meta, get_static_frame2
 
 logging.basicConfig(level=logging.INFO)
 
@@ -120,46 +123,80 @@ def classify_static(land_marks, means, method=ClassificationMethods.FLAT_COORDIN
     logging.info(out_put)
     return out_put
 
+def is_wrong_estimate(data_set_id, sign, wrong_estimates_df):
+    filtered = wrong_estimates_df[(wrong_estimates_df.sign == sign) & (wrong_estimates_df.data_set==data_set_id)]
+    return not filtered.empty
+
+def _evaluate_image_data(labels, classifier, file_id):
+    results_for_file = []
+    for index, row in labels.iterrows():
+        if row['label'] == 50 or row['label'] == 51: continue
+        # image = cv2.imread("./data/images/{}/{}".format(file_id, row["file_name"]))
+        land_marks = mp_estimate_pose_from_image("./data/images/{}/{}".format(file_id, row["file_name"]))
+        if not land_marks: continue
+        land_marks, angles = pre_process_single_frame(land_marks)
+        prediction = classifier.classify(land_marks)
+        if prediction[0].get('class') == 'NA':
+            continue
+        prediction = rule_based_classify(prediction[0], angles)
+        prediction[0].update({'truth_sign': LABEL_VS_INDEX.get(row['label'])})
+        # result_row = pd.DataFrame(prediction[0], index=[0])
+        results_for_file.append(prediction[0])
+    results_df_for_file = pd.DataFrame(results_for_file)
+    return results_df_for_file
+
+
+def _evaluate_video_data(labels, classifier, video_m, data_set_id):
+    video = video_m.get('location')
+    fps = video_m.get('fps')
+    results_list_for_file = []
+    we_file_path = './data/incorrect_estimates.csv'
+    wrong_estimates_df = pd.read_csv(we_file_path)
+    for index, row in labels.iterrows():
+        start_frame = row['start']
+        end_frame = row['end']
+
+        total_frames = end_frame - start_frame
+        # for frame in [start_frame + total_frames * .1 * i for i in range(1, 10)]:
+        for frame in [start_frame + total_frames * .25 * i for i in [1, 3]]:
+            if row['label'] == 50 or row['label'] == 51: continue
+            # if is_wrong_estimate(data_set_id, row['label'], wrong_estimates_df): continue
+            logging.info('Processing a single frame...')
+            image = get_static_frame2(video, frame)
+            land_marks = mp_estimate_pose_static(image)
+            if not land_marks: continue
+            land_marks, angles = pre_process_single_frame(land_marks)
+            # render_static(land_marks)
+            prediction = classifier.classify(land_marks)
+            if prediction[0].get('class') == 'NA':
+                continue
+            prediction = rule_based_classify(prediction[0], angles)
+            prediction[0].update({'truth_sign': LABEL_VS_INDEX.get(row['label'])})
+            results_list_for_file.extend(prediction)
+    # if len(results_list_for_file) == 0: continue
+        # preds = [x['class'] for x in results_list_for_file]
+        # mode_pred = statistics.mode(preds)
+        # mode_pred = [{'class': mode_pred, 'truth_sign': LABEL_VS_INDEX.get(row['label'])}]
+        # result_row = pd.DataFrame(mode_pred, index=[0])
+    results_for_file = pd.DataFrame(results_list_for_file)
+    return results_for_file
 
 def validate():
     all_results = pd.DataFrame()
     means = _get_training_data()
     # classifier = EnsembleClassifier(means, None)
     classifier = ExperimentalClassifier(means, None)
-    for file_id in [1, 2, 3, 4]:
+    for file_id in [10, 11]:
         file_path = './data/labels/{}.csv'.format(file_id)
         labels: pd.DataFrame = pd.read_csv(file_path)
-        # labels = labels[labels['label'] == 17]
-        results_for_file = pd.DataFrame()
-        for index, row in labels.iterrows():
-            video_m = video_meta.get(file_id)
-            video = video_m.get('location')
-            fps = video_m.get('fps')
+        # labels = labels[labels['label'] == 26]
+        video_m = video_meta.get(file_id)
 
-            start_time = row['start']
-            end_time = row['end']
+        if video_m:
+            results_for_file = _evaluate_video_data(labels, classifier, video_m, file_id)
+        else:
+            results_for_file = _evaluate_image_data(labels, classifier, file_id)
 
-            start_frame = start_time * fps
-            end_frame = end_time * fps
-
-            total_frames = end_frame - start_frame
-
-            for frame in [start_frame + total_frames * .1 * i for i in range(1, 10)]:
-                if row['label'] == 50 or row['label'] == 51: continue
-                logging.info('Processing a single frame...')
-                image = get_static_frame(video, frame / fps, fps=fps)
-                land_marks = mp_estimate_pose_static(image)
-                if not land_marks: continue
-                land_marks, angles = pre_process_single_frame(land_marks)
-                # print(angles)
-                # prediction = classify_static(land_marks, means, method=ClassificationMethods.ANGLES)
-                prediction = classifier.classify(land_marks)
-                if prediction[0].get('class') == 'NA':
-                    continue
-                prediction = rule_based_classify(prediction[0], angles)
-                prediction[0].update({'truth_sign': LABEL_VS_INDEX.get(row['label'])})
-                result_row = pd.DataFrame(prediction[0], index=[0])
-                results_for_file = results_for_file.append(result_row)
         if results_for_file.empty: continue
         all_results = all_results.append(results_for_file)
 
