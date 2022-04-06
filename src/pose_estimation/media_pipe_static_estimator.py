@@ -34,7 +34,7 @@ def static_images_2(file):
     # For static images:
     with mp_hands.Hands(
             static_image_mode=True,
-            max_num_hands=2,
+            max_num_hands=1,
             min_detection_confidence=0.5) as hands:
 
         # Read an image, flip it around y-axis for correct handedness output (see

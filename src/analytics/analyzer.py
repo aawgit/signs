@@ -7,14 +7,14 @@ import numpy as np
 from scipy.spatial import distance
 # from sklearn.cluster import KMeans
 # import matplotlib.pyplot as plt
-from feature_extraction.pre_processor import pre_process
+from src.feature_extraction.pre_processor import pre_process
 
-from pose_estimation.media_pipe_static_estimator import static_images
+from src.pose_estimation.media_pipe_static_estimator import static_images
 
 
 def add_dynamic_or_not():
     labels = pd.read_csv('./data/training/labels_Chaminda .csv')
-    angles_and_labels = pd.read_csv('./data/training/angles_labels_chaminda_2.csv')
+    angles_and_labels = pd.read_csv('../../data/training/angles_labels_chaminda_2.csv')
     merged = pd.merge(angles_and_labels, labels[['sign', 'dynamic']], left_on='label', right_on='sign', how='left')
     merged.dropna(subset=['label'], how='all', inplace=True)
     merged.to_csv('./data/training/angles_labels_chaminda_3.csv', index=False)

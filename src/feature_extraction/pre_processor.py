@@ -277,24 +277,59 @@ def run_pre_process_steps(pose_q, processed_q_1, duplicate_queues=None, for_labe
         try:
             if not pose_q.empty():
                 current_vertices, frame_no = pose_q.get()
-                current_vertices = pre_process(current_vertices, steps, args_for_steps)
+                current_vertices, original_angles = pre_process(current_vertices, steps, args_for_steps)
                 # coordinates = []
                 # for current_vertex in current_vertices:
                 #     for coordinate in current_vertex:
                 #         coordinates.append(np.round(coordinate, 8))
                 # logging.info(coordinates)
-                processed_q_1.put(current_vertices)
+                processed_q_1.put((current_vertices, original_angles))
                 if duplicate_queues:
                     for q in duplicate_queues:
                         if for_labelling:
-                            q.put((current_vertices, frame_no))
+                            q.put(((current_vertices, original_angles), frame_no))
                         else:
-                            q.put(current_vertices)
+                            q.put((current_vertices, original_angles))
             else:
                 pass
         except Exception as e:
             logging.error(e)
             break
 
+def make_right_handed():
+    l = [-0.29639709580602, 0.343219214739541, 0.254201292611363, -0.51895809688473, 0.744826255300432,
+         0.49000753946639, -0.718621539306147, 1.09385266684722, 0.682628863301124, -0.913062629474884,
+         1.36818884007564, 0.735345129854851, -0.273342832333906, 1.03462806361304, 0.195871885362095,
+         -0.211616846618731, 1.28513751923693, 0.488082013541652, -0.208794318593136, 1.08958852067422,
+         0.402876843606042, -0.216737444022668, 0.941882385680188, 0.269714616263431, -0.081351446133997,
+         0.972028704152652, 0.114832296412129, -0.056451457669432, 1.22680382086875, 0.476175728772469,
+         -0.070528201032265, 0.968522024327624, 0.413014049182185, -0.053368300059968, 0.81946256724041,
+         0.292803262967062, 0.126206667156132, 0.894176662733648, 0.033072516787178, 0.092516038228765,
+         1.09202948941252, 0.438226301612747, 0.068732122174872, 0.781937620386251, 0.382612889423777, 0.08152040904955,
+         0.617595405623193, 0.283732443368985, 0.338949180810885, 0.86170735551817, -0.033072516787178,
+         0.354526848480082, 1.24057640313612, 0.31402207856927, 0.395487890616822, 1.47202837548277, 0.519868002371577,
+         0.457489914270733, 1.73876901970362, 0.697934426047106, 6
+
+         ]
+
+    def flatten_points(land_marks: list):
+        flatten_coordinates = []
+        for point in land_marks:
+            for coordinate in point:
+                flatten_coordinates.append(coordinate)
+        return flatten_coordinates
+
+    def un_flatten_points(flatten_coordinates: list):
+        landmark_points = []
+        for i in range(0, len(flatten_coordinates), 3):
+            landmark_points.append(flatten_coordinates[i:i + 3])
+        return landmark_points
+
+    l_f = un_flatten_points(l)
+    n = 2
+    # l2_f =[ [x if (i % n or i==0) else -x for i, x in
+    l2_f = [[-x if (i == 0) else x for i, x in enumerate(coordinate)] for coordinate in l_f]
+    l2 = flatten_points(l2_f)
+    print(l2)
 # References for normalizing
 # S. Agahian et al. / Engineering Science and Technology, an International Journal 23 (2020) 196–203

@@ -4,8 +4,8 @@ from OpenGL.GLU import *
 import logging
 import pygame
 
-from utils.constants import EDGES_CUBE, VERTICES_CUBE
-from pose_estimation.vertices_mapper import EDGES_MEDIA_PIPE, VERTICES_DEFAULT_MP
+from src.utils.constants import EDGES_CUBE, VERTICES_CUBE
+from src.pose_estimation.vertices_mapper import EDGES_MEDIA_PIPE, VERTICES_DEFAULT_MP
 # from feature_extraction.pre_processor import get_angles, pre_process
 
 from scipy.spatial import distance
@@ -169,7 +169,7 @@ def render(queue):
         try:
             current_edges = EDGES_MEDIA_PIPE
             if not queue.empty():
-                current_vertices = queue.get()
+                current_vertices, angles = queue.get()
                 LAST_VERTICES[0] = current_vertices
 
             else:

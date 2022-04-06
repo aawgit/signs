@@ -1,8 +1,7 @@
 import logging
-from pose_estimation.media_pipe_dynamic_estimator import dynamic_images
-from pose_estimation.pose_estimator_by_frame import static_images
-from pose_estimation.adjuster import adjust_finger_bases
-from pose_estimation.media_pipe_static_estimator import static_images_2
+from src.pose_estimation.media_pipe_dynamic_estimator import dynamic_images
+from src.pose_estimation.pose_estimator_by_frame import static_images
+from src.pose_estimation.media_pipe_static_estimator import static_images_2
 
 
 def mp_callback(queue, results, frame_no):
@@ -23,7 +22,7 @@ def mp_callback(queue, results, frame_no):
             if left_hand:
                 land_mark = (landMark.x, landMark.y, landMark.z)
             else:
-                land_mark = (landMark.x, landMark.y, (-1) * landMark.z)
+                land_mark = ((-1) * landMark.x, landMark.y, landMark.z)
             frame_land_marks.append(land_mark)
             # if draw:
         queue.put((frame_land_marks, frame_no))
@@ -49,7 +48,7 @@ def mp_callback_static(results):
             if left_hand:
                 land_mark = (landMark.x, landMark.y, landMark.z)
             else:
-                land_mark = (landMark.x, landMark.y, (-1)*landMark.z)
+                land_mark = ((-1)*landMark.x, landMark.y, landMark.z)
             frame_land_marks.append(land_mark)
             # if draw:
     return frame_land_marks
