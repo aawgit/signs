@@ -629,7 +629,3 @@ def change_matplotlib_font(font_download_url):
     font_name = fm.FontProperties(fname=font_files[0]).get_name()
     matplotlib.rc('font', family=font_name)
     print("font family: ", plt.rcParams['font.family'])
-
-
-def dtw_test():
-    pass
