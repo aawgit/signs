@@ -291,7 +291,7 @@ def _evaluate_all_frames(start_frame, end_frame, total_frames, truth_sign, class
 def _evaluate_video_data(labels, classifier, video_m, data_set_id):
     video = video_m.get('location')
     results_list_for_file = []
-    we_file_path = '../../data/incorrect_estimates.csv'
+    we_file_path = '../data/incorrect_estimates.csv'
     wrong_estimates_df = pd.read_csv(we_file_path)
     for index, row in labels.iterrows():
         truth_sign = row['label']
@@ -321,7 +321,7 @@ def validate():
     all_results = pd.DataFrame()
     means = get_training_data()
     # classifier = EnsembleClassifier(means, None)
-    classifier = ExperimentalClassifier(means, None)
+    classifier = ExperimentalClassifier(means)
     for file_id in [1, 2, 4, 10, 11]: #[1, 2, 3, 4, 5, 10, 11]:
         file_path = '../data/labels/{}.csv'.format(file_id)
         labels: pd.DataFrame = pd.read_csv(file_path)
