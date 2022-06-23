@@ -602,7 +602,7 @@ def plot_cnf_matrix(all_results):
 
 
 def change_matplotlib_font(font_download_url):
-    FONT_PATH = '/home/aka/Downloads/Yaldevi'
+    FONT_PATH = 'utils/fonts/Yaldevi'
 
     # font_download_cmd = f"wget {font_download_url} -O {FONT_PATH}.zip"
     # unzip_cmd = f"unzip -o {FONT_PATH}.zip -d {FONT_PATH}"
