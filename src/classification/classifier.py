@@ -26,58 +26,58 @@ from src.feature_extraction.pre_processor import un_flatten_points, get_angle_v2
 from src.utils.constants import LABEL_VS_INDEX, EDGE_PAIRS_FOR_ANGLES
 
 
-class NearestNeighborPoseClassifier:
-    def __init__(self, cluster_means: pd.DataFrame, threshold):
-        self.cluster_means = self.unify_cluster_mean_features(cluster_means)
+class PoseClassifier:
+    def __init__(self, training_data: pd.DataFrame, threshold):
+        self.training_data = self.unify_training_data_features(training_data)
         self.threshold = threshold
 
-    def unify_cluster_mean_features(self, cluster_means):
+    def unify_training_data_features(self, training_data):
         pass
 
-    def unify_frame_features(self, landmark):
+    def unify_test_data_features(self, landmark):
         pass
 
     def classify(self, landmark):
         if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
-        incoming_frame = self.unify_frame_features(landmark)
+        incoming_frame = self.unify_test_data_features(landmark)
         # logging.info(incoming_frame)
-        self.cluster_means['distance'] = self.cluster_means.drop(['sign', 'distance'], errors='ignore', axis=1) \
+        self.training_data['distance'] = self.training_data.drop(['sign', 'distance'], errors='ignore', axis=1) \
             .apply(lambda x: distance.euclidean(x, incoming_frame), axis=1)
-        candidates_df = self.cluster_means.nsmallest(5, 'distance').sort_values(by=['distance'])
+        candidates_df = self.training_data.nsmallest(5, 'distance').sort_values(by=['distance'])
         candidates_df['class'] = candidates_df['sign'].apply(lambda x: LABEL_VS_INDEX.get(x))
 
         return candidates_df[['class', 'distance']].to_dict('records')
 
 
 
-class ClassifierByFlatCoordinates(NearestNeighborPoseClassifier):
-    def __init__(self, cluster_means: pd.DataFrame, threshold, vertices_to_ignore=None):
+class ClassifierByFlatCoordinates(PoseClassifier):
+    def __init__(self, training_data: pd.DataFrame, threshold, vertices_to_ignore=None):
         if vertices_to_ignore is None:
             vertices_to_ignore = [0, 5, 9, 13, 17]
         self.vertices_to_ignore = vertices_to_ignore
-        super().__init__(cluster_means, threshold)
+        super().__init__(training_data, threshold)
 
-    def unify_cluster_mean_features(self, cluster_means: pd.DataFrame):
-        # cluster_means = normalize_flat_coordinates_scale(cluster_means)
+    def unify_training_data_features(self, training_data: pd.DataFrame):
+        # training_data = normalize_flat_coordinates_scale(training_data)
         if self.vertices_to_ignore:
             cols_to_drop = []
             for vertex in self.vertices_to_ignore:
                 for i in range(0, 3):
                     cols_to_drop.append('{}_{}'.format(vertex, i))
 
-            unified_cluster_means = cluster_means.drop(cols_to_drop, errors='ignore', axis=1)
+            unified_training_data = training_data.drop(cols_to_drop, errors='ignore', axis=1)
         else:
-            unified_cluster_means = cluster_means
-        # unified_cluster_means = self._drop_z_axis(unified_cluster_means)
-        return unified_cluster_means.reset_index(drop=True)
+            unified_training_data = training_data
+        # unified_training_data = self._drop_z_axis(unified_training_data)
+        return unified_training_data.reset_index(drop=True)
 
-    def _drop_z_axis(self, cluster_means):
-        cols_to_drop = [col for col in cluster_means.columns.values if col.endswith('2')]
+    def _drop_z_axis(self, training_data):
+        cols_to_drop = [col for col in training_data.columns.values if col.endswith('2')]
 
-        remaining_cluster_means = cluster_means.drop(cols_to_drop, errors='ignore', axis=1)
-        return remaining_cluster_means
+        remaining_training_data = training_data.drop(cols_to_drop, errors='ignore', axis=1)
+        return remaining_training_data
 
-    def unify_frame_features(self, landmark):
+    def unify_test_data_features(self, landmark):
         landmark = list(landmark)
         if self.vertices_to_ignore:
             for idx, vertex in enumerate(self.vertices_to_ignore):
@@ -90,14 +90,14 @@ class ClassifierByFlatCoordinates(NearestNeighborPoseClassifier):
         del flattened_coordinates[k-1::k]
         return flattened_coordinates
 
-class ClassifierByAngles(NearestNeighborPoseClassifier):
-    def __init__(self, cluster_means: pd.DataFrame, vertices_to_ignore=None):
+class ClassifierByAngles(PoseClassifier):
+    def __init__(self, training_data: pd.DataFrame, vertices_to_ignore=None):
         self.vertices_to_ignore = vertices_to_ignore
-        super().__init__(cluster_means, 2)
+        super().__init__(training_data, 2)
 
-    def unify_cluster_mean_features(self, cluster_means):
-        signs = cluster_means['sign']
-        means_list = cluster_means.drop(['sign', 'source'], axis=1, errors='ignore').values.tolist()
+    def unify_training_data_features(self, training_data):
+        signs = training_data['sign']
+        means_list = training_data.drop(['sign', 'source'], axis=1, errors='ignore').values.tolist()
         mean_angles_df_cols = [str(point_pair) for point_pair in EDGE_PAIRS_FOR_ANGLES]
         mean_angles_df = pd.DataFrame(columns=mean_angles_df_cols)
 
@@ -115,7 +115,7 @@ class ClassifierByAngles(NearestNeighborPoseClassifier):
                                    axis=1).drop('index', axis=1, errors='ignore')
         return mean_angles_df
 
-    def unify_frame_features(self, landmark):
+    def unify_test_data_features(self, landmark):
         angles = []
         for limb_pair in EDGE_PAIRS_FOR_ANGLES:
             limb2 = [landmark[limb_pair[1][1]][i] - landmark[limb_pair[1][0]][i] for i in range(0, 3)]
@@ -126,46 +126,46 @@ class ClassifierByAngles(NearestNeighborPoseClassifier):
         return angles
 
 
-class ClassifierByAnglesAndCoordinates(NearestNeighborPoseClassifier):
-    def __init__(self, cluster_means: pd.DataFrame, threshold, vertices_to_ignore=None):
+class ClassifierByAnglesAndCoordinates(PoseClassifier):
+    def __init__(self, training_data: pd.DataFrame, threshold, vertices_to_ignore=None):
         self.vertices_to_ignore = vertices_to_ignore
-        self.coordinateClassifier = ClassifierByFlatCoordinates(cluster_means, threshold, vertices_to_ignore)
-        self.angleClassifier = ClassifierByAngles(cluster_means, threshold)
-        super().__init__(cluster_means, 2)
+        self.coordinateClassifier = ClassifierByFlatCoordinates(training_data, threshold, vertices_to_ignore)
+        self.angleClassifier = ClassifierByAngles(training_data, threshold)
+        super().__init__(training_data, 2)
 
-    def unify_cluster_mean_features(self, cluster_means):
-        unified_coordinates = self.coordinateClassifier.cluster_means.drop(['sign', 'source'], axis=1, errors='ignore')
-        unified_angles = self.angleClassifier.cluster_means
+    def unify_training_data_features(self, training_data):
+        unified_coordinates = self.coordinateClassifier.training_data.drop(['sign', 'source'], axis=1, errors='ignore')
+        unified_angles = self.angleClassifier.training_data
         unified_co_and_angle = pd.concat([unified_coordinates, unified_angles], axis=1)
         return unified_co_and_angle
 
-    def unify_frame_features(self, landmark):
-        unified_coordinates = self.coordinateClassifier.unify_frame_features(landmark)
-        unified_angles = self.angleClassifier.unify_frame_features(landmark)
+    def unify_test_data_features(self, landmark):
+        unified_coordinates = self.coordinateClassifier.unify_test_data_features(landmark)
+        unified_angles = self.angleClassifier.unify_test_data_features(landmark)
         unified_coordinates.extend(unified_angles)
         return unified_coordinates
 
 
 class DecisionTreeClassifier(ClassifierByAnglesAndCoordinates):
-    def __init__(self, cluster_means: pd.DataFrame, threshold, vertices_to_ignore=None):
-        super().__init__(cluster_means, threshold)
-        self.X = self.cluster_means.drop('sign', axis=1)
-        self.Y = self.cluster_means['sign']
+    def __init__(self, training_data: pd.DataFrame, threshold, vertices_to_ignore=None):
+        super().__init__(training_data, threshold)
+        self.X = self.training_data.drop('sign', axis=1)
+        self.Y = self.training_data['sign']
         self.clf = tree.DecisionTreeClassifier()
         self.clf.fit(self.X, self.Y)
 
     def classify(self, landmark):
         if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
-        incoming_frame = self.unify_frame_features(landmark)
+        incoming_frame = self.unify_test_data_features(landmark)
         self.clf.predict([incoming_frame])
 
 
 class ExperimentalClassifier(ClassifierByAnglesAndCoordinates):
-    def __init__(self, cluster_means: pd.DataFrame):
-        super().__init__(cluster_means, None)
-        # self.cluster_means = self.get_only_important_features_training(self.cluster_means)
-        X_train = self.cluster_means.drop('sign', axis=1).values
-        y_train = self.cluster_means['sign'].values
+    def __init__(self, training_data: pd.DataFrame):
+        super().__init__(training_data, None)
+        # self.training_data = self.get_only_important_features_training(self.training_data)
+        X_train = self.training_data.drop('sign', axis=1).values
+        y_train = self.training_data['sign'].values
         # self.lr = LogisticRegression(random_state=0).fit(X_train, y_train)  # Documented
         self.lr = LogisticRegression(random_state=0, C=10, penalty='l2', solver='newton-cg').fit(X_train, y_train) #hpp
         # self.lr = LogisticRegression(random_state=0,
@@ -191,11 +191,11 @@ class ExperimentalClassifier(ClassifierByAnglesAndCoordinates):
         self.knn1.fit(X_train, y_train)
         self.rf1.fit(X_train, y_train)
 
-        # self.clf4.fit(self.cluster_means.drop('sign', axis=1), self.cluster_means['sign'])
+        # self.clf4.fit(self.training_data.drop('sign', axis=1), self.training_data['sign'])
 
     def classify(self, landmark):
         if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
-        incoming_frame = self.unify_frame_features(landmark)
+        incoming_frame = self.unify_test_data_features(landmark)
         # incoming_frame = self.get_only_important_features(incoming_frame)
 
         pred_knn = self.knn1.predict([incoming_frame, ])
@@ -215,7 +215,7 @@ class ExperimentalClassifier(ClassifierByAnglesAndCoordinates):
 
     def classify2(self, landmark):
         if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
-        incoming_frame = self.unify_frame_features(landmark)
+        incoming_frame = self.unify_test_data_features(landmark)
         # incoming_frame = self.get_only_important_features(incoming_frame)
 
         pred_knn = self.knn1.predict([incoming_frame, ])
@@ -233,7 +233,7 @@ class ExperimentalClassifier(ClassifierByAnglesAndCoordinates):
 
     def classify3(self, landmark):
         if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
-        incoming_frame = self.unify_frame_features(landmark)
+        incoming_frame = self.unify_test_data_features(landmark)
 
         pred_lr = self.lr.predict([incoming_frame, ])
         prob = self.lr.predict_proba([incoming_frame, ])
@@ -251,7 +251,7 @@ class ExperimentalClassifier(ClassifierByAnglesAndCoordinates):
 
     def classify4(self, landmark):
         if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
-        incoming_frame = self.unify_frame_features(landmark)
+        incoming_frame = self.unify_test_data_features(landmark)
 
         pred_lr = self.lr.predict([incoming_frame, ])
         prob = self.lr.predict_proba([incoming_frame, ])
@@ -274,7 +274,7 @@ class ExperimentalClassifier(ClassifierByAnglesAndCoordinates):
 
     def classify5(self, landmark):
         if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
-        incoming_frame = self.unify_frame_features(landmark)
+        incoming_frame = self.unify_test_data_features(landmark)
 
         pred_lr = self.lr.predict([incoming_frame, ])
         pred_knn = self.knn1.predict([incoming_frame, ])
@@ -314,16 +314,19 @@ def rule_based_classify(pred, angles):
         return [{'class': LABEL_VS_INDEX.get(sign), 'index': sign}]
     else: return [pred]
 
-class EnsembleClassifier(NearestNeighborPoseClassifier):
-    def __init__(self, cluster_means: pd.DataFrame, threshold, vertices_to_ignore=None):
+class EnsembleClassifier(PoseClassifier):
+    """
+    Not selected for the thesis
+    """
+    def __init__(self, training_data: pd.DataFrame, threshold, vertices_to_ignore=None):
         self.vertices_to_ignore = vertices_to_ignore
-        self.coordinateClassifier = ClassifierByFlatCoordinates(cluster_means, threshold, vertices_to_ignore)
-        self.angleClassifier = ClassifierByAngles(cluster_means, threshold)
+        self.coordinateClassifier = ClassifierByFlatCoordinates(training_data, threshold, vertices_to_ignore)
+        self.angleClassifier = ClassifierByAngles(training_data, threshold)
 
-        super().__init__(cluster_means, threshold)
+        super().__init__(training_data, threshold)
 
-        X_train_c = self.coordinateClassifier.cluster_means.drop(['sign', 'source'], axis=1, errors='ignore').values
-        y_train_c = self.coordinateClassifier.cluster_means['sign'].values
+        X_train_c = self.coordinateClassifier.training_data.drop(['sign', 'source'], axis=1, errors='ignore').values
+        y_train_c = self.coordinateClassifier.training_data['sign'].values
 
         self.lr_c = LogisticRegression(random_state=0).fit(X_train_c, y_train_c)  # - Good
         self.knn1_c = KNeighborsClassifier(n_neighbors=3, metric='minkowski', p=4, weights='distance')  # - Good
@@ -333,8 +336,8 @@ class EnsembleClassifier(NearestNeighborPoseClassifier):
         self.knn1_c.fit(X_train_c, y_train_c)
         self.rf1_c.fit(X_train_c, y_train_c)
 
-        X_train_a = self.angleClassifier.cluster_means.drop('sign', axis=1).values
-        y_train_a = self.angleClassifier.cluster_means['sign'].values
+        X_train_a = self.angleClassifier.training_data.drop('sign', axis=1).values
+        y_train_a = self.angleClassifier.training_data['sign'].values
 
         self.lr_a = LogisticRegression(random_state=0).fit(X_train_a, y_train_a)  # - Good
         self.knn1_a = KNeighborsClassifier(n_neighbors=3, metric='minkowski', p=4, weights='distance')  # - Good
@@ -346,13 +349,13 @@ class EnsembleClassifier(NearestNeighborPoseClassifier):
 
     def classify(self, landmark):
         if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
-        incoming_frame_c = self.coordinateClassifier.unify_frame_features(landmark)
+        incoming_frame_c = self.coordinateClassifier.unify_test_data_features(landmark)
 
         pred_knn_c = self.knn1_c.predict([incoming_frame_c, ])
         pred_lr_c = self.lr_c.predict([incoming_frame_c, ])
         pred_rf1_c = self.rf1_c.predict([incoming_frame_c, ])
 
-        incoming_frame_a = self.angleClassifier.unify_frame_features(landmark)
+        incoming_frame_a = self.angleClassifier.unify_test_data_features(landmark)
         pred_knn_a = self.knn1_a.predict([incoming_frame_a, ])
         pred_lr_a = self.lr_a.predict([incoming_frame_a, ])
         pred_rf1_a = self.rf1_a.predict([incoming_frame_a, ])
@@ -372,29 +375,13 @@ class EnsembleClassifier(NearestNeighborPoseClassifier):
         prediction = [{'class': LABEL_VS_INDEX.get(p), 'index': p}]
         return prediction
 
-important_feature_idx = [0, 3, 5, 6, 7, 8, 9, 10, 11, 13, 16, 19, 20, 22, 25, 28, 31, 34, 35, 37, 38, 40, 43,
-                         44, 45, 46, 48, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62]
-
-
-def get_only_important_features(self, features: list):
-    important_features = []
-    for idx, val in enumerate(features):
-        if idx in self.important_feature_idx:
-            important_features.append(val)
-    return important_features
-
-
-def get_only_important_features_training(self, training_data: pd.DataFrame):
-    return training_data.iloc[:, [*self.important_feature_idx, 63]]
-
-
-def move_fingers_to_origin_training(self, training_data: pd.DataFrame):
-    pass
-
 
 class FingerwiseCompareClassifier(ClassifierByAnglesAndCoordinates):
-    def __init__(self, cluster_means: pd.DataFrame, threshold):
-        super().__init__(cluster_means, threshold)
+    """
+    Not selected for the thesis
+    """
+    def __init__(self, training_data: pd.DataFrame, threshold):
+        super().__init__(training_data, threshold)
         self.finger_joints = ((1, 2, 3, 4),
                               (6, 7, 8),
                               (10, 11, 12),
@@ -403,47 +390,47 @@ class FingerwiseCompareClassifier(ClassifierByAnglesAndCoordinates):
 
     def classify(self, landmark):
         if not landmark: return [{'class': 'NA', 'distance': 'NA'}]
-        incoming_frame = self.unify_frame_features(landmark)
-        prediction = classify_finger_wise(incoming_frame, self.cluster_means)
+        incoming_frame = self.unify_test_data_features(landmark)
+        prediction = self.classify_finger_wise(incoming_frame, self.training_data)
         return prediction
 
 
-def classify_finger_wise(references, incoming_frame):
-    finger_joints = ((1, 2, 3, 4),
-                     (6, 7, 8),
-                     (10, 11, 12),
-                     (14, 15, 16),
-                     (18, 19, 20))
-    if not incoming_frame: return [{'class': 'NA', 'distance': 'NA'}]
+    def classify_finger_wise(self, references, incoming_frame):
+        finger_joints = ((1, 2, 3, 4),
+                         (6, 7, 8),
+                         (10, 11, 12),
+                         (14, 15, 16),
+                         (18, 19, 20))
+        if not incoming_frame: return [{'class': 'NA', 'distance': 'NA'}]
 
-    selected_references = references
-    selected_references['total_distance'] = 0
-    for idx, finger in enumerate(finger_joints):
-        col_names = [('{}_0'.format(joint), '{}_1'.format(joint), '{}_2'.format(joint)) for joint in finger]
-        col_names = flatten_points(col_names)
-        starting_index = (finger[0] - (idx + 1)) * 3
-        end_index = starting_index + len(finger) * 3
-        incoming_finger = incoming_frame[starting_index: end_index]
-        selected_references['distance'] = selected_references.drop(['sign', 'distance'], errors='ignore', axis=1) \
-            [col_names] \
-            .apply(lambda x: distance.euclidean(x, incoming_finger), axis=1)
-        selected_references['total_distance'] = selected_references['total_distance'] + selected_references['distance']
-        selected_references = selected_references[selected_references.distance < 0.5]
-        if selected_references.empty:
-            logging.info('No matching sign at finger {}'.format(idx))
-            return [{'class': 'NA', 'distance': 'NA'}]
-    selected_references = selected_references.sort_values(by=['total_distance'])
-    sign = LABEL_VS_INDEX.get(selected_references['sign'].iloc[0])
-    logging.info('Sign is')
-    return [{'class': sign}]
+        selected_references = references
+        selected_references['total_distance'] = 0
+        for idx, finger in enumerate(finger_joints):
+            col_names = [('{}_0'.format(joint), '{}_1'.format(joint), '{}_2'.format(joint)) for joint in finger]
+            col_names = flatten_points(col_names)
+            starting_index = (finger[0] - (idx + 1)) * 3
+            end_index = starting_index + len(finger) * 3
+            incoming_finger = incoming_frame[starting_index: end_index]
+            selected_references['distance'] = selected_references.drop(['sign', 'distance'], errors='ignore', axis=1) \
+                [col_names] \
+                .apply(lambda x: distance.euclidean(x, incoming_finger), axis=1)
+            selected_references['total_distance'] = selected_references['total_distance'] + selected_references['distance']
+            selected_references = selected_references[selected_references.distance < 0.5]
+            if selected_references.empty:
+                logging.info('No matching sign at finger {}'.format(idx))
+                return [{'class': 'NA', 'distance': 'NA'}]
+        selected_references = selected_references.sort_values(by=['total_distance'])
+        sign = LABEL_VS_INDEX.get(selected_references['sign'].iloc[0])
+        logging.info('Sign is')
+        return [{'class': sign}]
 
 
 class HyperParameterFinder(ClassifierByAnglesAndCoordinates):
-    def __init__(self, cluster_means: pd.DataFrame, threshold):
-        super().__init__(cluster_means, threshold)
-        # self.cluster_means = self.get_only_important_features_training(self.cluster_means)
-        self.X_train = self.cluster_means.drop('sign', axis=1).values
-        self.y_train = self.cluster_means['sign'].values
+    def __init__(self, training_data: pd.DataFrame, threshold):
+        super().__init__(training_data, threshold)
+        # self.training_data = self.get_only_important_features_training(self.training_data)
+        self.X_train = self.training_data.drop('sign', axis=1).values
+        self.y_train = self.training_data['sign'].values
 
     def tune_hyper_parameters_lr(self):
 

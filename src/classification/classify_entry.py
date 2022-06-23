@@ -350,7 +350,7 @@ def validate():
     plot_cnf_matrix(all_results)
 
 
-def find_hyper_parameters():
+def find_hyper_parameters(model=None):
     means = get_training_data(hp=True)
     classifier = HyperParameterFinder(means, None)
     # classifier.tune_hyper_parameters_lr()
