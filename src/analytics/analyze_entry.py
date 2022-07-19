@@ -1,9 +1,11 @@
 from matplotlib import pyplot as plt
 
+from src.feature_extraction.pre_processor import pre_process_single_frame
+from src.pose_estimation.interfacer import mp_estimate_pose_static
 from src.pose_estimation.media_pipe_dynamic_estimator import static_images
 from src.classification.classify_entry import get_training_data
 from src.pose_estimation.vertices_mapper import EDGES_MEDIA_PIPE
-from src.utils.video_utils import video_meta
+from src.utils.video_utils import video_meta, get_static_frame2
 
 
 def get_saved_land_mark(sign, sign_file_df, candidate_no=0, source=None):
@@ -34,6 +36,7 @@ def save_landmark_plot(label: str, landmark: list, plot_folder: str, file_name: 
     xdata = [point[0] for point in un_flattened]
     ydata = [point[1] for point in un_flattened]
     axs.scatter3D(xdata, ydata, zdata, c=zdata, cmap='Greens')
+    plt.axis('off')
     for point_pair in EDGES_MEDIA_PIPE:
         first = point_pair[0]
         second = point_pair[1]
@@ -41,12 +44,12 @@ def save_landmark_plot(label: str, landmark: list, plot_folder: str, file_name: 
     plt.savefig("{}/{}-{}.png".format(plot_folder, label, file_name))
 
 if __name__ == '__main__':
-    means = get_training_data()
+    # means = get_training_data()
 
-    video_m = video_meta.get(5)
+    video_m = video_meta.get(1)
     video = video_m.get('location')
     fps = video_m.get('fps')
-    frame = 1293
+    frame = 2187
     #
     # time = 150.658561296859  # testing th, estimations seem flat
     ref_sign = 27
@@ -56,7 +59,7 @@ if __name__ == '__main__':
 
     # saved_lm2 = get_saved_land_mark(ref_sign, means, 4)
 
-    # # image = get_static_frame2(video, frame)
+    image = get_static_frame2(video, frame)
     # image = cv2.imread('/home/aka/Downloads/20220128_145109.jpg')
     # land_marks = mp_estimate_pose_from_image('/home/aka/Downloads/14-03_3/20220314_231741.jpg')
     # land_marks, angles = pre_process_single_frame(land_marks)
@@ -71,11 +74,11 @@ if __name__ == '__main__':
 
     # time = 1 + 48
     # image2 = get_static_frame2(video, frame)
-    # land_marks2 = mp_estimate_pose_static(image2)
-    # land_marks2, angles2 = pre_process_single_frame(land_marks2)
+    land_marks2 = mp_estimate_pose_static(image)
+    land_marks2, angles2 = pre_process_single_frame(land_marks2)
     # # #
     # render_static(land_marks)
 
     # render_static_2_hands(saved_lm, land_marks2)
-    # save_landmark_plot('', saved_lm, '', '')
-    static_images(['/home/aka/Downloads/20220329_100524.jpg'])
+    save_landmark_plot('', land_marks2, '', '')
+    # static_images(['/home/aka/Downloads/20220329_100524.jpg'])

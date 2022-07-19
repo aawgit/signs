@@ -1,8 +1,4 @@
-from src.analytics.analyzer import plot_training_data_histogram
-from src.classification.classify_entry import validate, find_hyper_parameters
+from src.classification.classify_entry import process_video
 
 if __name__ == '__main__':
-    # process_video(classify=True)
-    # validate()
-    # plot_training_data_histogram()
-    find_hyper_parameters('RF')
+    process_video(classify=True, is_video=True)

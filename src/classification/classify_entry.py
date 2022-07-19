@@ -9,19 +9,22 @@ from sklearn.metrics import precision_score, accuracy_score, classification_repo
 
 from src.classification.classifier import ClassifierByFlatCoordinates, ClassifierByAngles, \
     ClassifierByAnglesAndCoordinates, CascadedClassifier, rule_based_classify, IndividualClassifier, \
-    tune_hpp_classifier_option, LogisticRegressionPoseClassifier, KNNPoseClassifier, RandomForestPoseClassifier
+    tune_hpp_classifier_option, LogisticRegressionPoseClassifier, KNNPoseClassifier, RandomForestPoseClassifier, \
+    XGBoostPoseClassifier, DesicionTreePoseClassifier, NaiveBaysPoseClassifier
+from src.classification.classifier_alternative_options import CascadedClassifierAngles
 from src.feature_extraction.pre_processor import run_pre_process_steps, pre_process_single_frame
 from src.feature_extraction.renderer import render, render_static
 from src.pose_estimation.interfacer import mp_estimate_pose, mp_estimate_pose_static, mp_estimate_pose_from_image
 from src.classification.classifier import plot_cnf_matrix
 from src.pose_estimation.media_pipe_dynamic_estimator import _temp_dynamic_images
 from src.utils.constants import ClassificationMethods, LABEL_VS_INDEX
+from src.utils.helper import OutputFilter
 from src.utils.video_utils import get_static_frame, show_frame, video_meta, get_static_frame2
 
 logging.basicConfig(level=logging.INFO)
 
 
-def process_video(video=None, classify=False, method=ClassificationMethods.ENSEMBLE_1):
+def process_video(video=None, classify=False, is_video=False):
     no_of_processes = 3 if classify else 2
     pool = multiprocessing.Pool(processes=no_of_processes)
     m = multiprocessing.Manager()
@@ -35,7 +38,7 @@ def process_video(video=None, classify=False, method=ClassificationMethods.ENSEM
         pre_processed_q_2 = m.Queue()
         duplicate_queues = [pre_processed_q_2]
         training_data = get_training_data()
-        pool.apply_async(cascaded_classifier_worker, (pre_processed_q_2, training_data))
+        pool.apply_async(cascaded_classifier_worker, (pre_processed_q_2, training_data, is_video))
 
     pool.apply_async(run_pre_process_steps, (hand_pose_q, pre_processed_q_1, duplicate_queues))
     # logging.error(un_flatten_points(list(training_data.drop('sign', axis=1, errors='ignore').iloc[0])))
@@ -105,7 +108,7 @@ def get_training_data(with_origins=False, hp=False):
     subjects = ['subject01', 'subject02', 'subject03', 'subject04']
     training_data = pd.DataFrame()
     for subject in subjects:
-        land_mark_file = '../data/{}/landmarks.csv'.format(subject)
+        land_mark_file = 'data/{}/landmarks.csv'.format(subject)
         land_marks: pd.DataFrame = pd.read_csv(land_mark_file)
         land_marks = land_marks[(land_marks.correct != 0) & (land_marks.use != 0)]
         training_data = training_data.append(land_marks)
@@ -147,17 +150,22 @@ def _get_validation_set():
     return diffs
 
 
-def cascaded_classifier_worker(processed_q, training_data):
+def cascaded_classifier_worker(processed_q, training_data, video=False):
     classifier = CascadedClassifier(training_data)
     previous_sign = None
+    filter = OutputFilter()
     while True:
         try:
             if not processed_q.empty():
                 vertices, angles = processed_q.get()
                 candidate_signs = classifier.classify_cascaded(vertices, angles)
-                if candidate_signs and candidate_signs[0]['class'] != previous_sign:
-                    logging.info('Classification result {}'.format(candidate_signs))
-                    previous_sign = candidate_signs[0]['class']
+                if not video:
+                    if candidate_signs and candidate_signs[0]['class'] != previous_sign:
+                        logging.info('Classification result {}'.format(candidate_signs))
+                        previous_sign = candidate_signs[0]['class']
+                else:
+                    output = filter.filter(candidate_signs)
+                    logging.info(output)
             else:
                 pass
         except Exception as e:
@@ -168,13 +176,13 @@ def cascaded_classifier_worker(processed_q, training_data):
 def classifier_worker(processed_q, means, method):
     logging.info('Classifier worker running. Method: {}'.format(method))
     if method == ClassificationMethods.FLAT_COORDINATES:
-        classifier = ClassifierByFlatCoordinates(means, 2, [])
+        classifier = ClassifierByFlatCoordinates(means, [])
     if method == ClassificationMethods.ANGLES:
         classifier = ClassifierByAngles(means)
     if method == ClassificationMethods.ANGLES_AND_FLAT_CO:
-        classifier = ClassifierByAnglesAndCoordinates(means, 2)
+        classifier = ClassifierByAnglesAndCoordinates(means)
     if method == ClassificationMethods.ENSEMBLE_1:
-        classifier = CascadedClassifier(means, 2)
+        classifier = CascadedClassifier(means)
     previous_sign = None
     while True:
         try:
@@ -368,15 +376,44 @@ def validate():
 
 def find_hyper_parameters(model: str):
     training_data = get_training_data()
-    if model=='LR':
+    if model == 'LR':
         LogisticRegressionPoseClassifier(training_data).tune_hpp()
-    if model=='KNN':
+    if model == 'KNN':
         KNNPoseClassifier(training_data).tune_hpp()
-    if model=='RF':
+    if model == 'RF':
         RandomForestPoseClassifier(training_data).tune_hpp()
-    if model=='EN':
+    if model == 'XG':
+        XGBoostPoseClassifier(training_data).tune_hpp()
+    if model == 'DT':
+        DesicionTreePoseClassifier(training_data).tune_hpp()
+    if model == 'NB':
+        NaiveBaysPoseClassifier(training_data).tune_hpp()
+    if model == 'EN':
         CascadedClassifier(training_data).hpp_level1_ensemble(training_data)
-    # tune_hpp_classifier_option(training_data)
+    if model == 'CAS':
+        training_data = get_training_data(hp=True)
+        CascadedClassifier(training_data).hpp_cascaded(training_data)
+    if model == 'OP':
+        # training_data = get_training_data(hp=True)
+        tune_hpp_classifier_option(training_data)
+    if model == 'AN':
+        CascadedClassifierAngles(training_data).hpp_level1_ensemble(training_data)
+
+
+def lc(model: str):
+    training_data = get_training_data()
+    if model == 'LR':
+        LogisticRegressionPoseClassifier(training_data).plot_lc()
+    if model == 'KNN':
+        KNNPoseClassifier(training_data).plot_lc()
+    if model == 'RF':
+        RandomForestPoseClassifier(training_data).plot_lc()
+    if model == 'XG':
+        XGBoostPoseClassifier(training_data).tune_hpp()
+    if model == 'DT':
+        DesicionTreePoseClassifier(training_data).tune_hpp()
+    if model == 'NB':
+        NaiveBaysPoseClassifier(training_data).tune_hpp()
 
 
 def get_measures():
