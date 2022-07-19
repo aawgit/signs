@@ -1,6 +1,6 @@
-# Classifier for Sinhala Fingerspelling Sign Language Alphabet
+# Sinhala Fingerspelling Sign Language Recognition with Computer Vision
 
-A computer vision based translator for Sinhala Fingerspelling Sign Language Alphabet.
+A computer vision based desktop application for translating Sinhala Fingerspelling Sign Language Alphabet.
 
 # Data
 Option 1: https://www.kaggle.com/datasets/akalankaweerasooriya/sinhala-fingerspelling
