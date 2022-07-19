@@ -44,9 +44,9 @@ def get_static_frame2(video_file, frame_no):
 
 video_meta = {
     1: dict(
-        location="../data/video/SLSL - Sinhala Sign Alphabet - Sri Lankan Sign Language - Chaminda Hewapathirana.mp4",
+        location="../../data/subject05/video.mp4",
         fps=29.97),
-    2: dict(location="../data/video/yt1s.com - SLSL1Sinhala Manual Alphabet_360p.mp4",
+    2: dict(location="../../data/subject06/video.mp4",
             fps=29.97),
 
     3: dict(location="../data/video/Geshani.mp4",

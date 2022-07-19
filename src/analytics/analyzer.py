@@ -6,10 +6,14 @@ import pandas as pd
 import numpy as np
 from scipy.spatial import distance
 # from sklearn.cluster import KMeans
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+
+from src.classification.classifier import change_matplotlib_font
+from src.classification.classify_entry import get_training_data
 from src.feature_extraction.pre_processor import pre_process
 
 from src.pose_estimation.media_pipe_static_estimator import static_images
+from src.utils.constants import LABEL_VS_INDEX
 
 
 def add_dynamic_or_not():
@@ -218,6 +222,57 @@ def split_points_to_coordinates(land_marks: pd.DataFrame):
             new_df[col] = land_marks[column].apply(lambda point: point[n])
     new_df['sign'] = land_marks['sign']
     return new_df
+
+def plot_training_data_histogram():
+    training_data = get_training_data(with_origins=True, hp=True)
+    x = [LABEL_VS_INDEX.get(s_index).split(' ')[1] for s_index in list(training_data['sign'])]
+    # plt.hist(x, bins=len(x))
+    # plt.show()
+    training_data['sign_2'] = x
+
+    # training_data['sign_2'].value_counts().plot(kind='bar')
+
+    # Uncomment these for plot1
+    signs_unique = list(training_data['sign_2'].unique())
+    categories = training_data['sign_2'].value_counts()[signs_unique].index
+    counts = training_data['sign_2'].value_counts()[signs_unique].values
+    change_matplotlib_font('font_download_url')
+    plt.bar(categories, counts, width=0.5)
+    plt.title('Distribution of Training Data')
+    plt.xlabel('Sign')
+    plt.ylabel('Count')
+    plt.show()
+
+    # Uncomment for subject-wise plot
+    # goaldf = pd.concat([training_data, pd.get_dummies(training_data.subject)], axis=1)[['sign_2','subject01', 'subject02', 'subject03', 'subject04']].groupby('sign_2').sum().reset_index()
+    # b = []
+    # colors = plt.cm.get_cmap('jet',5)
+    # xticks = [i for i in range(len(goaldf))]
+    #
+    # columns = goaldf.columns.values
+    #
+    # fig, ax = plt.subplots(1, 1)
+    # for i in range(1, len(columns)):
+    #     if i == 1:
+    #         bar_bottom = 0
+    #     else:
+    #         bar_bottom = bar_bottom + goaldf[columns[i - 1]].values
+    #     b.append(plt.bar(xticks,
+    #                      goaldf[columns[i]].values,
+    #                      bottom=bar_bottom,
+    #                      color=colors(i)))
+    #     for i in range(len(b)):
+    #         # ax.bar_label(b[i],
+    #         #              padding=0,
+    #         #              label_type='center',
+    #         #              rotation='horizontal')
+    #         ax.set_ylabel('Goal Contributions')
+    # ax.set_xlabel('Players')
+    # ax.set_xticks(xticks)
+    # ax.set_xticklabels(goaldf['sign_2'].values, rotation=45)  # , rotation_mode = 'anchor')
+    # ax.set_title('Top Ten Goal Contributions in 2020-2021')
+    # ax.legend(b, columns[1:])
+    # plt.show()
 
 if __name__ == '__main__':
     land_mark_vs_label = pd.read_csv('./data/training/sign_vs_landmark_t01.csv', converters=converter).drop(['frame', 'sign_character'], axis=1, errors='ignore')

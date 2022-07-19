@@ -1,6 +1,7 @@
 import logging
 
 import pygame
+from scipy.stats import mode
 
 from src.utils.constants import LABEL_VS_INDEX
 
@@ -32,3 +33,15 @@ class KeyInputHolder:
         windowSurface = pygame.display.set_mode((WIDTH, HEIGHT), 0, 32)
 
         windowSurface.fill(BLACK)
+
+
+class OutputFilter:
+    def __init__(self, buffer_size=30):
+        self.buffer = ['No sign']*buffer_size
+
+    def filter(self, candidate_signs):
+        sign = candidate_signs[0]['class']
+        self.buffer.pop(0)
+        self.buffer.append(sign)
+        p = mode(self.buffer).mode[0]
+        return p
