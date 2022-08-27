@@ -3,6 +3,7 @@ import logging
 import multiprocessing
 import threading
 import os
+import json
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial import distance
 
 from src.pose_estimation.vertices_mapper import EDGES_MEDIA_PIPE
+from src.utils.helper import _get_landmark_col_names
 from src.utils.video_utils import get_static_frame2
 
 from src.feature_extraction.pre_processor import run_pre_process_steps, pre_process_single_frame, flatten_points, \
@@ -174,69 +176,93 @@ def callback(img, frame_no, queue):
         queue.put((land_marks, frame_no))
         return land_marks
 
+# def save_landmarks_to_file(row, source_image_id, target_file):
+#     if row['label'] == 51 or row['correct'] == 0 or row['use'] == 0:
+#         return
+#     logging.info('Processing image {}...'.format(source_image_id))
+#
+#     land_marks = mp_estimate_pose_from_image(image_file_path + file_name)
+#     if not land_marks:  continue
+#
+#     lm_row = []
+#     for landmark_point in land_marks:
+#         lm_row.extend(np.round(landmark_point, 4))
+#     with open(target_file, 'a') as fd:
+#         writer = csv.writer(fd)
+#         writer.writerow([row['label'], *lm_row, subject_id])
 
-def create_training_data_from_video(video_m, file_id, file_name=None):
-    file_path = './data/labels/{}.csv'.format(file_id)
-    labels: pd.DataFrame = pd.read_csv(file_path)
+def _set_headers(target_file):
+    with open(target_file, 'a') as fd:
+        writer = csv.writer(fd)
+        col_names = _get_landmark_col_names()
+        writer.writerow(['sign', *col_names, 'subject_id', 'source_image', 'correct', 'use'])
+
+# Deprecated. TODO: Replace with the function in classifier entry
+def create_training_data_from_video(subject_id, target_file=None):
+    base_path = './data/subject{}/'.format('0' + str(subject_id) if subject_id < 10 else subject_id)
+    labels_file = base_path + 'labels.csv'
+    labels: pd.DataFrame = pd.read_csv(labels_file)
+
+    with open(base_path + 'meta.json', 'r') as fcc_file:
+        meta_data = json.load(fcc_file)
+
+    video = base_path + 'video.' + meta_data['format']
+
+    if not target_file: target_file = base_path + 'landmarks_v2.csv'
+
+    _set_headers(target_file)
+
 
     for index, row in labels.iterrows():
-        video = video_m.get('location')
-        fps = video_m.get('fps')
-
         start_time = row['start']
         end_time = row['end']
 
-        start_frame = start_time * fps
-        end_frame = end_time * fps
+        start_frame = start_time #* fps
+        end_frame = end_time #* fps
 
         total_frames = end_frame - start_frame
 
         for frame in [start_frame + total_frames * .25 * i for i in [1, 3]]:
-            if row['label'] == 50 or row['label'] == 51: continue
-            logging.info('Processing a single frame...')
-            image = get_static_frame(video, frame / fps, fps=fps)
+            if row['label'] == 50 or row['correct'] == 0 or row['use'] == 0:
+                continue
+            logging.info('Processing a single frame {}...'.format(frame))
+            image = get_static_frame(video, frame)
             land_marks = mp_estimate_pose_static(image)
-            land_marks = pre_process_single_frame(land_marks)
-            print('Saving current landmark {}'.format(land_marks))
-            if not file_name: file_name = os.path.basename(video)
-            path = "./data/training/{}.csv".format(file_name.split(".")[0])
-            sign = row['label']
+            if not land_marks: continue
             lm_row = []
             for landmark_point in land_marks:
                 lm_row.extend(np.round(landmark_point, 4))
-            with open(path, 'a') as fd:
+            with open(target_file, 'a') as fd:
                 writer = csv.writer(fd)
-                writer.writerow([sign, *lm_row])
+                writer.writerow([row['label'], *lm_row, subject_id, frame])
 
+# Deprecated. TODO: Replace with the function in classifier entry
+def create_training_data_from_images(subject_id, target_file=None):
+    base_path = './data/subject{}/'.format('0' + str(subject_id) if subject_id < 10 else subject_id)
+    labels_file = base_path + 'labels.csv'
+    labels: pd.DataFrame = pd.read_csv(labels_file)
 
-def create_training_data_from_images(data_set_id, target_file_name=None):
-    file_path = './data/labels/{}.csv'.format(data_set_id)
-    labels: pd.DataFrame = pd.read_csv(file_path)
-
-    image_file_path = './data/images/{}/'.format(data_set_id)
-    if not target_file_name: target_file_name = data_set_id
+    image_file_path = base_path + 'images/'
+    if not target_file: target_file = base_path + 'landmarks_v2.csv'
+    _set_headers(target_file)
 
     for index, row in labels.iterrows():
-        label = row['label']
         file_name = row['file_name']
 
-        if label == 51:
+        if row['label'] == 50 or row['correct'] == 0 or row['use'] == 0:
             continue
-        logging.info('Processing a single frame...')
+        logging.info('Processing image {}...'.format(file_name))
 
-        land_marks = mp_estimate_pose_from_image(image_file_path+file_name)
+        land_marks = mp_estimate_pose_from_image(image_file_path + file_name)
         if not land_marks:  continue
-        land_marks, angles = pre_process_single_frame(land_marks)
-        if not land_marks: continue
-        print('Saving current landmark {}'.format(land_marks))
 
-        path = "./data/training/{}.csv".format(str(target_file_name).split(".")[0])
         lm_row = []
         for landmark_point in land_marks:
             lm_row.extend(np.round(landmark_point, 4))
-        with open(path, 'a') as fd:
+        with open(target_file, 'a') as fd:
             writer = csv.writer(fd)
-            writer.writerow([label, *lm_row, data_set_id])
+            writer.writerow([row['label'], *lm_row, subject_id, file_name])
+
 
 def save_landmark_plot(label: str, landmark: list, plot_folder: str, file_name: str):
     fig, axs = plt.subplots(2, 2, figsize=(10, 10), subplot_kw=dict(projection='3d'))
@@ -262,11 +288,13 @@ def save_landmark_plot(label: str, landmark: list, plot_folder: str, file_name: 
             ax.plot3D([xdata[first], xdata[second]], [ydata[first], ydata[second]], [zdata[first], zdata[second]], 'b')
     plt.savefig("{}/{}-{}.png".format(plot_folder, label, file_name))
 
+
 def plot_images(landmarks: pd.DataFrame):
     i = 0
     for row in landmarks.values.tolist():
         save_landmark_plot(row[0], row[1: 64], '../_TMP', i)
         i = 1 + i
+
 
 def save_landmark_plot_tmp(label: str, landmark: list, plot_folder: str, file_name: str):
     fig = plt.figure()
@@ -291,6 +319,7 @@ def save_landmark_plot_tmp(label: str, landmark: list, plot_folder: str, file_na
         second = point_pair[1]
         ax.plot3D([xdata[first], xdata[second]], [ydata[first], ydata[second]], [zdata[first], zdata[second]], 'b')
     plt.savefig("{}/{}-{}.png".format(plot_folder, label, file_name))
+
 
 def save_lm_polot_temp(file):
     try:
@@ -343,6 +372,7 @@ def save_landmark_and_plot_images(data_set_id) -> None:
 
         # plt.savefig("{}/{}-{}.png".format(plot_folder, label, file_name.split('.')[0]))
 
+
 def save_landmark_and_plot_video(subject_id, n_samples):
     base_directory = '../data'
     labels_file = '{}/{}/labels.csv'.format(base_directory, subject_id)
@@ -378,18 +408,23 @@ def save_landmark_and_plot_video(subject_id, n_samples):
                 writer = csv.writer(fd)
                 writer.writerow([label, *lm_row, subject_id, frame])
 
+
 def detect_similar_landmarks(threshold):
     training_data = get_training_data(with_origins=True)
     training_data.reset_index(inplace=True, drop=True)
     all_distances = {}
-    for index, row in training_data.drop(['subject', 'image', 'correct', 'use', 'distances'], errors='ignore', axis=1).iterrows():
+    for index, row in training_data.drop(['subject', 'image', 'correct', 'use', 'distances'], errors='ignore',
+                                         axis=1).iterrows():
         sign = row['sign']
-        training_data['distances'] = training_data.drop(['sign', 'subject', 'image', 'correct', 'use', 'distances'], errors='ignore', axis=1) \
+        training_data['distances'] = training_data.drop(['sign', 'subject', 'image', 'correct', 'use', 'distances'],
+                                                        errors='ignore', axis=1) \
             .apply(lambda x: distance.euclidean(x, row[1:]), axis=1)
-        small_distance = training_data[training_data['distances']<threshold]
-        if small_distance.shape[0]>1:
-            all_distances.update({index: {'distances': small_distance[['sign', 'distances', 'subject', 'image']], 'sign': sign}})
+        small_distance = training_data[training_data['distances'] < threshold]
+        if small_distance.shape[0] > 1:
+            all_distances.update(
+                {index: {'distances': small_distance[['sign', 'distances', 'subject', 'image']], 'sign': sign}})
     x = 5
+
 
 if __name__ == '__main__':
     # video_m = video_meta.get(9)
