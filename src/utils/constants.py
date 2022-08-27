@@ -89,7 +89,8 @@ STATIC_INDICES = [1, 2, 3, 5, 7, 9, 13, 14, 16, 17, 19, 20, 21, 22,
 EDGE_PAIRS_FOR_ANGLES = [
     # ((17, 5), (0, 2)),
     # ((0, 9), (0, 1)),
-    ((0, 5), (0, 2)), # Thumb abduction/ adduction
+    # ((0, 5), (0, 2)), # Thumb abduction/ adduction
+    ((5, 0), (0, 2)), # Thumb abduction/ adduction
     ((0, 1), (1, 2)),
     ((1, 2), (2, 3)),
     ((2, 3), (3, 4)),
@@ -110,6 +111,11 @@ EDGE_PAIRS_FOR_ANGLES = [
     ((17, 18), (18, 19)),
     ((18, 19), (19, 20)),
 
+    # ((4,0), (0, 8)),
+    # ((8,0), (0, 12)),
+    # ((12,0), (0, 16)),
+    # ((16,0), (0, 20)),
+
     # ((5, 9), (9, 10)),
     # ((9, 10), (13, 14)),
     # ((13, 14), (17, 18)),
@@ -124,3 +130,8 @@ class ClassificationMethods:
     ANGLES = 'ANGLES'
     ANGLES_AND_FLAT_CO = 'ANGLES_AND_FLAT_COORDINATES'
     ENSEMBLE_1 = 'ENSEMBLE_1'
+
+VERTICES_TO_IGNORE = [0, 5, 9, 13, 17]
+
+IMPORTANT_FEATURES = [6, 7, 9, 16, 19, 22, 25, 26, 28, 32, 34, 37, 41, 43, 44, 46, 47, 48, 50, 51, 52, 53, 54, 55,
+                      56, 57, 58, 59, 60, 61, 62, 63]

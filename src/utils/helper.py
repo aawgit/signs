@@ -3,6 +3,7 @@ import logging
 import pygame
 from scipy.stats import mode
 
+from src.feature_extraction.pre_processor import flatten_points
 from src.utils.constants import LABEL_VS_INDEX
 
 
@@ -45,3 +46,8 @@ class OutputFilter:
         self.buffer.append(sign)
         p = mode(self.buffer).mode[0]
         return p
+
+
+def _get_landmark_col_names():
+    col_names = flatten_points([('{}_0'.format(i), '{}_1'.format(i), '{}_2'.format(i)) for i in range(0, 21)])
+    return col_names

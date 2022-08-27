@@ -26,9 +26,8 @@ def show_frame(frame):
     cv2.waitKey()
 
 
-def get_static_frame(video_file, seconds, fps=29.970030):
+def get_static_frame(video_file, frame_no):
     cap = cv2.VideoCapture(video_file)
-    frame_no = seconds * fps
     cap.set(1, frame_no)
     res, frame = cap.read()
     cap.release()

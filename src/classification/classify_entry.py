@@ -4,47 +4,48 @@ import threading
 import statistics
 import time as tm_mod
 import json
+from time import sleep
+
 import pandas as pd
 from sklearn.metrics import precision_score, accuracy_score, classification_report
 
-from src.classification.classifier import ClassifierByFlatCoordinates, ClassifierByAngles, \
-    ClassifierByAnglesAndCoordinates, CascadedClassifier, rule_based_classify, IndividualClassifier, \
-    tune_hpp_classifier_option, LogisticRegressionPoseClassifier, KNNPoseClassifier, RandomForestPoseClassifier, \
-    XGBoostPoseClassifier, DesicionTreePoseClassifier, NaiveBaysPoseClassifier
+from src.classification.classifier import rule_based_classify, MultiLevelClassifier, LevelOneClassifier
+from src.archived.classifier import ClassifierByFlatCoordinates, ClassifierByAngles, ClassifierByAnglesAndCoordinates, \
+    LogisticRegressionPoseClassifier, RandomForestPoseClassifier, KNNPoseClassifier, XGBoostPoseClassifier, \
+    DesicionTreePoseClassifier, NaiveBaysPoseClassifier, CascadedClassifier, tune_hpp_classifier_option
 from src.classification.classifier_alternative_options import CascadedClassifierAngles
-from src.feature_extraction.pre_processor import run_pre_process_steps, pre_process_single_frame
+from src.feature_extraction.pre_processor import run_pre_process_steps, pre_process_single_frame, build_feature_vector
 from src.feature_extraction.renderer import render, render_static
 from src.pose_estimation.interfacer import mp_estimate_pose, mp_estimate_pose_static, mp_estimate_pose_from_image
 from src.classification.classifier import plot_cnf_matrix
-from src.pose_estimation.media_pipe_dynamic_estimator import _temp_dynamic_images
 from src.utils.constants import ClassificationMethods, LABEL_VS_INDEX
 from src.utils.helper import OutputFilter
-from src.utils.video_utils import get_static_frame, show_frame, video_meta, get_static_frame2
+from src.utils.video_utils import get_static_frame, show_frame, get_static_frame2
 
 logging.basicConfig(level=logging.INFO)
 
 
-def process_video(video=None, classify=False, is_video=False):
+def process_video(video=None, classify=False, filter_enabled=True):
     no_of_processes = 3 if classify else 2
     pool = multiprocessing.Pool(processes=no_of_processes)
     m = multiprocessing.Manager()
     hand_pose_q = m.Queue()
 
-    pool.apply_async(mp_estimate_pose, (hand_pose_q, video))
+
     pre_processed_q_1 = m.Queue()
 
     duplicate_queues = []
     if classify:
         pre_processed_q_2 = m.Queue()
         duplicate_queues = [pre_processed_q_2]
-        training_data = get_training_data()
-        pool.apply_async(cascaded_classifier_worker, (pre_processed_q_2, training_data, is_video))
+        X_train, y_train = get_training_data()
+        training_data = (X_train, y_train)
+        pool.apply_async(cascaded_classifier_worker, (pre_processed_q_2, training_data, filter_enabled))
 
+    pool.apply_async(mp_estimate_pose, (hand_pose_q, video))
     pool.apply_async(run_pre_process_steps, (hand_pose_q, pre_processed_q_1, duplicate_queues))
-    # logging.error(un_flatten_points(list(training_data.drop('sign', axis=1, errors='ignore').iloc[0])))
-    # render_static_and_dynamic(pre_processed_q_1,un_flatten_points(list(training_data.drop('sign', axis=1, errors='ignore').iloc[0])) )
-    render(pre_processed_q_1)
-    # sleep(600)
+    # render(pre_processed_q_1) # TODO: Fix rendering with new pre-processing
+    sleep(600)
 
 
 def process_single_frame(video_file, seconds, fps, classify=False, method=ClassificationMethods.ANGLES_AND_FLAT_CO):
@@ -60,67 +61,25 @@ def process_single_frame(video_file, seconds, fps, classify=False, method=Classi
     threading.Thread(target=show_frame, args=(image,), daemon=True).start()
 
     render_static(land_marks)
-    # render_static_2_hands(land_marks, land_marks_2)
-
-
-def _temp_find_frame():
-    means = _get_training_data_old()
-
-    video = '../data/subject01/videos/right/th-w.mp4'
-
-    _temp_dynamic_images(means, video)
-
-
-def _get_training_data_old():
-    # TODO: Rename
-    means_file = '../../data/training/reference-signs-aw-01-right.csv'
-    means: pd.DataFrame = pd.read_csv(means_file)
-
-    means_file_2 = '../../data/training/reference-signs-aw-01-left.csv'
-    means2 = pd.read_csv(means_file_2)
-    means = means.append(means2)
-
-    # means_file_3 = './data/training/reference-signs-geshani.csv'
-    # means3 = pd.read_csv(means_file_3)
-    # means = means.append(means3)
-
-    means_file_4 = '../../data/training/8.csv'
-    means4 = pd.read_csv(means_file_4)
-    means = means.append(means4)
-
-    means_file_5 = '../../data/training/9.csv'
-    means5 = pd.read_csv(means_file_5)
-    means = means.append(means5)
-
-    # means_file_6 = '../data/training/1-remainder.csv'
-    # means6 = pd.read_csv(means_file_6)
-    # means = means.append(means6)
-
-    training_set = means
-
-    # file_all = './data/training/curated/all.csv'
-    # training_set = pd.read_csv(file_all)
-
-    return training_set
 
 
 def get_training_data(with_origins=False, hp=False):
-    subjects = ['subject01', 'subject02', 'subject03', 'subject04']
+    subject_ids = [1, 2, 3, 4, 6, 8]
     training_data = pd.DataFrame()
-    for subject in subjects:
-        land_mark_file = 'data/{}/landmarks.csv'.format(subject)
-        land_marks: pd.DataFrame = pd.read_csv(land_mark_file)
-        land_marks = land_marks[(land_marks.correct != 0) & (land_marks.use != 0)]
+    for subject_id in subject_ids:
+        land_marks = get_training_data_for_subject(subject_id)
         training_data = training_data.append(land_marks)
 
     if not with_origins:
-        training_data.drop(['subject', 'image', 'correct', 'use'], axis=1, inplace=True, errors='ignore')
-    # training_data = training_data[(training_data.sign != 27) & (training_data.sign != 17) & (training_data.sign != 30)]
+        training_data.drop(['subject_id', 'source_image', 'correct', 'used'], axis=1, inplace=True, errors='ignore')
     if not hp:
         training_data = training_data[
             (training_data.sign != 7) & (training_data.sign != 17) & (training_data.sign != 30)]
-
-    return training_data
+    t_data = list(training_data.values.tolist())
+    feature_extracted_t_data = [list(build_feature_vector(t_data_row[1:])[0]) for t_data_row in t_data]
+    # for i, row in enumerate(feature_extracted_t_data):
+    #     row.insert(0, t_data[i][0])
+    return feature_extracted_t_data, [t_data_row[0] for t_data_row in t_data]
 
 
 def _get_validation_set():
@@ -151,14 +110,14 @@ def _get_validation_set():
 
 
 def cascaded_classifier_worker(processed_q, training_data, video=False):
-    classifier = CascadedClassifier(training_data)
+    classifier = MultiLevelClassifier(training_data[0], training_data[1])
     previous_sign = None
     filter = OutputFilter()
     while True:
         try:
             if not processed_q.empty():
-                vertices, angles = processed_q.get()
-                candidate_signs = classifier.classify_cascaded(vertices, angles)
+                feature_vector, orientation = processed_q.get()
+                candidate_signs = classifier.classify(feature_vector, orientation)
                 if not video:
                     if candidate_signs and candidate_signs[0]['class'] != previous_sign:
                         logging.info('Classification result {}'.format(candidate_signs))
@@ -227,8 +186,8 @@ def _evaluate_image_data(labels, classifier, base_path):
         # image = cv2.imread("./data/images/{}/{}".format(file_id, row["file_name"]))
         land_marks = mp_estimate_pose_from_image(base_path + "/images/{}".format(row["file_name"]))
         if not land_marks: continue
-        land_marks, angles = pre_process_single_frame(land_marks)
-        prediction = classifier.classify_cascaded(land_marks, angles)
+        land_marks, angles = build_feature_vector(land_marks)
+        prediction = classifier.classify(land_marks, angles)
         # if prediction[0].get('class') == 'NA':
         #     continue
         # prediction = rule_based_classify(prediction[0], angles)
@@ -255,9 +214,9 @@ def _get_mode_sign(video, start_frame_no, end_frame_no, truth_sign, classifier):
         tot_frames_est = tot_frames_est + 1
         if not land_marks: continue
         start = tm_mod.process_time()
-        land_marks, angles = pre_process_single_frame(land_marks)
+        land_marks, angles = build_feature_vector(land_marks)
         # render_static(land_marks)
-        prediction = classifier.classify_cascaded(land_marks, angles)
+        prediction = classifier.classify(land_marks, angles)
         # if prediction[0].get('class') == 'NA':
         #     continue
         # prediction = rule_based_classify(prediction[0], angles)
@@ -309,7 +268,7 @@ def _evaluate_all_frames(start_frame, end_frame, total_frames, truth_sign, class
 def _evaluate_video_data(labels, classifier, path, data_set_id):
     video = path
     results_list_for_file = []
-    we_file_path = '../data/incorrect_estimates.csv'
+    we_file_path = 'data/incorrect_estimates.csv'
     wrong_estimates_df = pd.read_csv(we_file_path)
     for index, row in labels.iterrows():
         truth_sign = row['label']
@@ -337,11 +296,11 @@ def _evaluate_video_data(labels, classifier, path, data_set_id):
 
 def validate():
     all_results = pd.DataFrame()
-    training_data = get_training_data()
+    X_train, y_train = get_training_data()
     # classifier = EnsembleClassifier(training_data, None)
-    classifier = CascadedClassifier(training_data)
-    for subject_id in [5, 6, 7, 8, 9]:
-        base_path = '../data/subject{}'.format(subject_id if subject_id > 9 else '0{}'.format(subject_id))
+    classifier = MultiLevelClassifier(X_train, y_train)
+    for subject_id in [5, 7, 9]:
+        base_path = 'data/subject{}'.format(subject_id if subject_id > 9 else '0{}'.format(subject_id))
         file_path = base_path + '/labels.csv'
         labels: pd.DataFrame = pd.read_csv(file_path)
 
@@ -375,29 +334,32 @@ def validate():
 
 
 def find_hyper_parameters(model: str):
-    training_data = get_training_data()
-    if model == 'LR':
-        LogisticRegressionPoseClassifier(training_data).tune_hpp()
-    if model == 'KNN':
-        KNNPoseClassifier(training_data).tune_hpp()
-    if model == 'RF':
-        RandomForestPoseClassifier(training_data).tune_hpp()
-    if model == 'XG':
-        XGBoostPoseClassifier(training_data).tune_hpp()
-    if model == 'DT':
-        DesicionTreePoseClassifier(training_data).tune_hpp()
-    if model == 'NB':
-        NaiveBaysPoseClassifier(training_data).tune_hpp()
-    if model == 'EN':
-        CascadedClassifier(training_data).hpp_level1_ensemble(training_data)
-    if model == 'CAS':
-        training_data = get_training_data(hp=True)
-        CascadedClassifier(training_data).hpp_cascaded(training_data)
-    if model == 'OP':
-        # training_data = get_training_data(hp=True)
-        tune_hpp_classifier_option(training_data)
-    if model == 'AN':
-        CascadedClassifierAngles(training_data).hpp_level1_ensemble(training_data)
+    X_train, y_train = get_training_data()
+    # if model == 'LR':
+    #     LogisticRegressionPoseClassifier(training_data).tune_hpp()
+    # if model == 'KNN':
+    #     KNNPoseClassifier(training_data).tune_hpp()
+    # if model == 'RF':
+    #     RandomForestPoseClassifier(training_data).tune_hpp()
+    # if model == 'XG':
+    #     XGBoostPoseClassifier(training_data).tune_hpp()
+    # if model == 'DT':
+    #     DesicionTreePoseClassifier(training_data).tune_hpp()
+    # if model == 'NB':
+    #     NaiveBaysPoseClassifier(training_data).tune_hpp()
+    # if model == 'EN':
+    #     CascadedClassifier(training_data).hpp_level1_ensemble(training_data)
+    # if model == 'CAS':
+    #     training_data = get_training_data(hp=True)
+    #     CascadedClassifier(training_data).hpp_cascaded(training_data)
+    # if model == 'OP':
+    #     # training_data = get_training_data(hp=True)
+    #     tune_hpp_classifier_option(training_data)
+    # if model == 'AN':
+    #     CascadedClassifierAngles(training_data).hpp_level1_ensemble(training_data)
+
+    if model == 'L1':
+        LevelOneClassifier(X_train, y_train).hpt()
 
 
 def lc(model: str):
@@ -422,30 +384,75 @@ def get_measures():
     logging.info(clf_r)
 
 
-if __name__ == '__main__':
-    logging.info('Initiating classification...')
-    video_m = video_meta.get(4)
-    video = video_m.get('location')
-    # fps = video_m.get('fps')
-    #
-    # time = 31.2
+def reduce_data_points(landmarks_list: list):
+    # TODO: Implement
+    return landmarks_list[0]
 
-    # process_single_frame(video, time, fps, classify=True, method=ClassificationMethods.ANGLES)
 
-    # process_video(video, classify=True, method=ClassificationMethods.ENSEMBLE_1)
-    # process_video()
-    # means = _get_training_data()
-    # classifier = DecisionTreeClassifier(means, 2)
-    #
-    # image = get_static_frame(video, time, fps=fps)
-    # land_marks = mp_estimate_pose_static(image)
-    # land_marks = pre_process_single_frame(land_marks)
-    #
-    # out_put = classifier.classify(land_marks)
-    # logging.info(out_put)
+def _not_to_be_used(data_point):
+    if data_point['label'] == 50 or data_point['correct'] == 0 or data_point['used'] == 0:
+        return True
+    return False
 
-    # validate()
-    # find_hyper_parameters()
-    # _get_training_data()
-    # _temp_find_frame()
-    get_measures()
+
+def get_training_data_from_video(base_path, labels):
+    with open(base_path + 'meta.json', 'r') as fcc_file:
+        meta_data = json.load(fcc_file)
+
+    video = base_path + 'video.' + meta_data['format']
+    rows = []
+    for index, row in labels.iterrows():
+        start_frame = row['start']
+        end_frame = row['end']
+
+        total_frames = end_frame - start_frame
+
+        landmarks_list = []
+        for frame in [start_frame + total_frames * .25 * i for i in [1, 3]]:
+            if _not_to_be_used(row):
+                continue
+            logging.info('Processing a single frame {}...'.format(frame))
+            image = get_static_frame(video, frame)
+            land_marks = mp_estimate_pose_static(image)
+            if not land_marks: continue
+            landmarks_list.append(land_marks)
+        if len(landmarks_list) > 0:
+            rows.append([row['label'], *reduce_data_points(landmarks_list), None, row['correct'], row['used']])
+    return pd.DataFrame(rows, columns=['sign', *list(range(0, 21)), 'source_image', 'correct', 'used'])
+
+
+def get_training_data_from_images(base_path, labels):
+    image_file_path = base_path + 'images/'
+    rows = []
+    for index, row in labels.iterrows():
+        file_name = row['file_name']
+
+        if _not_to_be_used(row):
+            continue
+
+        logging.info('Processing image {}...'.format(file_name))
+
+        land_marks = mp_estimate_pose_from_image(image_file_path + file_name)
+        if not land_marks:  continue
+
+        rows.append([row['label'], *land_marks, row['file_name'], row['correct'], row['used']])
+
+    return pd.DataFrame(rows, columns=['sign', *list(range(0, 21)), 'source_image', 'correct', 'used'])
+
+
+def get_training_data_for_subject(subject_id):
+    base_path = './data/subject{}/'.format('0' + str(subject_id) if subject_id < 10 else subject_id)
+    labels_file = base_path + 'labels.csv'
+    labels: pd.DataFrame = pd.read_csv(labels_file)
+
+    with open(base_path + 'meta.json', 'r') as fcc_file:
+        meta_data = json.load(fcc_file)
+
+    if meta_data.get('type') == 'PHOTO':
+        t_data = get_training_data_from_images(base_path, labels)
+        return t_data
+    elif meta_data.get('type') == 'VIDEO':
+        t_data = get_training_data_from_video(base_path, labels)
+        return t_data
+    else:
+        raise Exception('Unrecognized resource type {}'.format(meta_data.get('type')))

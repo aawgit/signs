@@ -167,7 +167,7 @@ def dynamic_images(queue, callback, file=None):
 
             callback(queue, results, frame_no)
 
-            cv2.imshow('MediaPipe Hands', image)
+            cv2.imshow('Video stream', image)
             if cv2.waitKey(5) & 0xFF == 27:
                 print(frames/tot_du)
                 break
