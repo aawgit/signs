@@ -29,10 +29,20 @@ class LevelOneClassifier:
     def __init__(self, X_train: list, y_train: list):
         self.X_train = X_train
         self.y_train = y_train
-        self.lr = LogisticRegression(multi_class='multinomial', random_state=1, C=100, penalty='l2', solver='newton-cg',
-                                     max_iter=1000)
-        self.knn = KNeighborsClassifier(n_neighbors=3, metric='minkowski', p=3, weights='distance')
-        self.rf = RandomForestClassifier(n_estimators=100, random_state=0, criterion='entropy', max_features='log2')
+        self.lr = LogisticRegression(
+            multi_class="multinomial",
+            random_state=1,
+            C=100,
+            penalty="l2",
+            solver="newton-cg",
+            max_iter=1000,
+        )
+        self.knn = KNeighborsClassifier(
+            n_neighbors=3, metric="minkowski", p=3, weights="distance"
+        )
+        self.rf = RandomForestClassifier(
+            n_estimators=100, random_state=0, criterion="entropy", max_features="log2"
+        )
 
     def train(self):
         self.lr.fit(self.X_train, self.y_train)
@@ -44,54 +54,82 @@ class LevelOneClassifier:
         cv = RepeatedStratifiedKFold(n_splits=4, n_repeats=15, random_state=1)
         all_results = []
         for train_index, test_index in cv.split(X, y):
-            self.knn.fit(_select_data_by_index(X, train_index), _select_data_by_index(y, train_index))
-            self.rf.fit(_select_data_by_index(X, train_index), _select_data_by_index(y, train_index))
-            self.lr.fit(_select_data_by_index(X, train_index), _select_data_by_index(y, train_index))
+            self.knn.fit(
+                _select_data_by_index(X, train_index),
+                _select_data_by_index(y, train_index),
+            )
+            self.rf.fit(
+                _select_data_by_index(X, train_index),
+                _select_data_by_index(y, train_index),
+            )
+            self.lr.fit(
+                _select_data_by_index(X, train_index),
+                _select_data_by_index(y, train_index),
+            )
             results = []
             for row_index in test_index:
                 landmarks = X[row_index]
                 predicted = self.classify(landmarks)
-                results.append(dict(true=y[row_index], predicted=predicted[0].get('index')))
+                results.append(
+                    dict(true=y[row_index], predicted=predicted[0].get("index"))
+                )
             all_results.extend(results)
         all_results_df = pd.DataFrame(all_results)
-        acc = accuracy_score(all_results_df['true'], all_results_df['predicted'])
+        acc = accuracy_score(all_results_df["true"], all_results_df["predicted"])
         logging.info(acc)
 
     def classify(self, feature_vector):
-        if not feature_vector: return [{'class': 'NA', 'distance': 'NA'}]
+        if not feature_vector:
+            return [{"class": "NA", "distance": "NA"}]
 
-        pred_lr = self.lr.predict([feature_vector, ])
-        prob = self.lr.predict_proba([feature_vector, ])
+        pred_lr = self.lr.predict(
+            [
+                feature_vector,
+            ]
+        )
+        prob = self.lr.predict_proba(
+            [
+                feature_vector,
+            ]
+        )
         prob = max(*prob)
 
         if prob > 0.6:
             p = pred_lr[0]
         else:
-            pred_knn = self.knn.predict([feature_vector, ])
-            pred_rf1 = self.rf.predict([feature_vector, ])
+            pred_knn = self.knn.predict(
+                [
+                    feature_vector,
+                ]
+            )
+            pred_rf1 = self.rf.predict(
+                [
+                    feature_vector,
+                ]
+            )
             p = mode([pred_rf1[0], pred_lr[0], pred_knn[0]]).mode[0]
 
-        prediction = [{'class': LABEL_VS_INDEX.get(p), 'index': p}]
+        prediction = [{"class": LABEL_VS_INDEX.get(p), "index": p}]
         return prediction
 
 
 class MultiLevelClassifier:
     def __init__(self, X_train: list, y_train: list):
-        logging.info('Initializing classifier...')
+        logging.info("Initializing classifier...")
         self.level_one_classifier = LevelOneClassifier(X_train, y_train)
         self.level_one_classifier.train()
-        logging.info('Classifier trained.')
+        logging.info("Classifier trained.")
 
     def classify(self, landmarks, orientation):
         level_one_pred = self.level_one_classifier.classify(landmarks)
-        if level_one_pred[0].get('class') == 'NA':
+        if level_one_pred[0].get("class") == "NA":
             return
         pred = rule_based_classify(level_one_pred[0], orientation)
         return pred
 
 
 def rule_based_classify(pred, angles):
-    pred_sign = pred.get('index')
+    pred_sign = pred.get("index")
     # 'U උ' and 'L ල්'
     if pred_sign == 7 or pred_sign == 27:
         z_rotation = angles[1]
@@ -99,7 +137,7 @@ def rule_based_classify(pred, angles):
             sign = 27
         else:
             sign = 7
-        return [{'class': LABEL_VS_INDEX.get(sign), 'index': sign}]
+        return [{"class": LABEL_VS_INDEX.get(sign), "index": sign}]
     # 'Dh ද්' and 'P ප්'
     elif pred_sign == 17 or pred_sign == 22:
         z_rotation = angles[1]
@@ -107,7 +145,7 @@ def rule_based_classify(pred, angles):
             sign = 17
         else:
             sign = 22
-        return [{'class': LABEL_VS_INDEX.get(sign), 'index': sign}]
+        return [{"class": LABEL_VS_INDEX.get(sign), "index": sign}]
         # 'H හ්' and 'AW ඖ'
     elif pred_sign == 30 or pred_sign == 51:
         z_rotation = angles[1]
@@ -115,27 +153,33 @@ def rule_based_classify(pred, angles):
             sign = 51
         else:
             sign = 30
-        return [{'class': LABEL_VS_INDEX.get(sign), 'index': sign}]
+        return [{"class": LABEL_VS_INDEX.get(sign), "index": sign}]
     else:
         return [pred]
 
 
 def plot_cnf_matrix(all_results):
-    all_results.truth_sign = all_results['truth_sign'].apply(lambda x: x.split(' ')[1])
-    all_results['class'] = all_results['class'].apply(lambda x: x.split(' ')[1])
-    change_matplotlib_font('font_download_url')
+    all_results.truth_sign = all_results["truth_sign"].apply(lambda x: x.split(" ")[1])
+    all_results["class"] = all_results["class"].apply(lambda x: x.split(" ")[1])
+    change_matplotlib_font("font_download_url")
 
-    cf_matrix = confusion_matrix(all_results['truth_sign'], all_results['class'],
-                                 labels=all_results['truth_sign'].unique())
+    cf_matrix = confusion_matrix(
+        all_results["truth_sign"],
+        all_results["class"],
+        labels=all_results["truth_sign"].unique(),
+    )
 
-    cf_matrix = cf_matrix.astype('float') / cf_matrix.sum(axis=1)[:, np.newaxis]
+    cf_matrix = cf_matrix.astype("float") / cf_matrix.sum(axis=1)[:, np.newaxis]
     ## Display the visualization of the Confusion Matrix.
-    df_cm = pd.DataFrame(cf_matrix, index=all_results['truth_sign'].unique(),
-                         columns=all_results['truth_sign'].unique())
-    ax = sns.heatmap(df_cm, annot=True, cmap='Blues', fmt='.1f')
+    df_cm = pd.DataFrame(
+        cf_matrix,
+        index=all_results["truth_sign"].unique(),
+        columns=all_results["truth_sign"].unique(),
+    )
+    ax = sns.heatmap(df_cm, annot=True, cmap="Blues", fmt=".1f")
     # ax.set_title('Confusion Matrix for Test Data\n\n')
-    ax.set_xlabel('\nPredicted Category')
-    ax.set_ylabel('Actual Category ')
+    ax.set_xlabel("\nPredicted Category")
+    ax.set_ylabel("Actual Category ")
     # plt.rc('axes', unicode_minus=False)
     # plt.rc('font', **{'sans-serif' : 'Arial',
     #                      'family' : 'sans-serif'})
@@ -143,7 +187,7 @@ def plot_cnf_matrix(all_results):
 
 
 def change_matplotlib_font(font_download_url):
-    FONT_PATH = 'utils/fonts/Yaldevi'
+    FONT_PATH = "utils/fonts/Yaldevi"
 
     # font_download_cmd = f"wget {font_download_url} -O {FONT_PATH}.zip"
     # unzip_cmd = f"unzip -o {FONT_PATH}.zip -d {FONT_PATH}"
@@ -155,8 +199,8 @@ def change_matplotlib_font(font_download_url):
         fm.fontManager.addfont(font_file)
 
     font_name = fm.FontProperties(fname=font_files[0]).get_name()
-    matplotlib.rc('font', family=font_name)
-    print("font family: ", plt.rcParams['font.family'])
+    matplotlib.rc("font", family=font_name)
+    print("font family: ", plt.rcParams["font.family"])
 
 
 def dtw_test():
@@ -164,15 +208,15 @@ def dtw_test():
 
 
 def plot_learning_curve(
-        estimator,
-        title,
-        X,
-        y,
-        axes=None,
-        ylim=None,
-        cv=None,
-        n_jobs=None,
-        train_sizes=np.linspace(0.1, 1.0, 5),
+    estimator,
+    title,
+    X,
+    y,
+    axes=None,
+    ylim=None,
+    cv=None,
+    n_jobs=None,
+    train_sizes=np.linspace(0.1, 1.0, 5),
 ):
     """
     Generate 3 plots: the test and training learning curve, the training

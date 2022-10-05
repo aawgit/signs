@@ -1,6 +1,6 @@
 import logging
-import math
 import numpy as np
+from math import sqrt, degrees
 from scipy.spatial import distance
 
 from src.utils.constants import EDGE_PAIRS_FOR_ANGLES, VERTICES_TO_IGNORE, IMPORTANT_FEATURES
@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 def get_sin_and_cos(a, b):
-    c = math.sqrt(a ** 2 + b ** 2)
+    c = sqrt(a ** 2 + b ** 2)
     cos = a / c
     sin = b / c
     return sin, cos
@@ -139,7 +139,7 @@ def pre_process(land_marks):
     rotations = []
     for idx, step in enumerate(steps):
         processed, rotation = step(processed, *args_for_steps[idx])
-        if rotation: rotations.append(math.degrees(rotation))
+        if rotation: rotations.append(degrees(rotation))
     return tuple(processed), rotations
 
 
@@ -157,7 +157,7 @@ def get_angle(v1, v2):
         return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
     angle = angle_between(v1, v2)
-    return math.degrees(np.pi - angle)
+    return degrees(np.pi - angle)
 
 
 def flatten_points(land_marks: list):
