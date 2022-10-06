@@ -18,10 +18,13 @@ https://www.kaggle.com/datasets/akalankaweerasooriya/sinhala-fingerspelling
 
 # Running
 1. Add the root directory (signs) to PYTHONPATH
-- In Linux based systems, export PYTHONPATH=$PYTHONPATH:</path/to/signs/directory>
+- In Linux based systems, run `export PYTHONPATH=$PYTHONPATH:</path/to/signs/directory>`
 2. To train the model and run real time translation using a webcam, run src/main.py
 
 # Paper
-https://ieeexplore.ieee.org/document/9906281
-https://www.researchgate.net/publication/364120463_Sinhala_Fingerspelling_Sign_Language_Recognition_with_Computer_Vision
+-https://ieeexplore.ieee.org/document/9906281
+-https://www.researchgate.net/publication/364120463_Sinhala_Fingerspelling_Sign_Language_Recognition_with_Computer_Vision
+
+# Web app code base
+https://github.com/aawgit/signs-web
 
