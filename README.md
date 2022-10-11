@@ -8,6 +8,8 @@ https://signsl.web.app/
 ## Data
 https://www.kaggle.com/datasets/akalankaweerasooriya/sinhala-fingerspelling
 
+Alternative download: https://u.pcloud.link/publink/show?code=XZjE7jVZLgi7N85ivjhHAskliw7IyR8qc5tX
+
 
 ## Installation
 1. Clone the repo
