@@ -13,14 +13,14 @@ Alternative download: https://u.pcloud.link/publink/show?code=XZjE7jVZLgi7N85ivj
 
 ## Installation
 1. Clone the repo
-2. Download the dataset as specified in the above section.
+2. Download the dataset from a link in the above section.
 3. Extract the data (9 directories) to signs/data directory
 4. (Optional) Create a virtual environment and activate it
 5. Install the requirements by running `pip install -r requirements.txt`
 
 ## Running
 1. Add the root directory (signs) to PYTHONPATH
-- In Linux based systems, run `export PYTHONPATH=$PYTHONPATH:</path/to/signs/directory>`
+- To do that in Linux based systems, run `export PYTHONPATH=$PYTHONPATH:</path/to/signs/directory>`
 2. To train the model and run real time translation using a webcam, run src/main.py
 
 ## Paper
